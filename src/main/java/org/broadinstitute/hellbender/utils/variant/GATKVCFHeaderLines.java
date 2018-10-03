@@ -196,6 +196,7 @@ public class GATKVCFHeaderLines {
         addInfoLine(new VCFInfoHeaderLine(EVENT_COUNT_IN_HAPLOTYPE_KEY, 1, VCFHeaderLineType.Integer, "Number of events in this haplotype"));
         addInfoLine(new VCFInfoHeaderLine(NORMAL_LOD_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Normal LOD score"));
         addInfoLine(new VCFInfoHeaderLine(TUMOR_LOD_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Tumor LOD score"));
+        addFormatLine(new VCFFormatHeaderLine(TUMOR_LOD_KEY, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Tumor LOD score"));
         addInfoLine(new VCFInfoHeaderLine(IN_PON_VCF_ATTRIBUTE, 0, VCFHeaderLineType.Flag, "site found in panel of normals"));
         addInfoLine(new VCFInfoHeaderLine(POPULATION_AF_VCF_ATTRIBUTE, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "population allele frequencies of alt alleles"));
         addInfoLine(new VCFInfoHeaderLine(GERMLINE_POSTERIORS_VCF_ATTRIBUTE, VCFHeaderLineCount.A, VCFHeaderLineType.Float, "Posterior probability for alt allele to be germline variants"));

@@ -437,7 +437,9 @@ public class GVCFWriterUnitTest extends GATKBaseTest {
 
     @Test(dataProvider = "GoodBandPartitionData")
     public void testGoodPartitions(final List<Integer> partitions, List<Range<Integer>> expected) {
-        final RangeMap<Integer, Range<Integer>> ranges = GVCFWriter.parsePartitions(partitions);
+        final MockWriter mockWriter = new MockWriter();
+        final GVCFWriter writer = new GVCFWriter(mockWriter, standardPartition, HomoSapiensConstants.DEFAULT_PLOIDY);
+        final RangeMap<Integer, Range<Integer>> ranges = writer.parsePartitions(partitions);
         Assert.assertEquals(new ArrayList<>(ranges.asMapOfRanges().values()), expected);
     }
 
@@ -456,7 +458,9 @@ public class GVCFWriterUnitTest extends GATKBaseTest {
 
     @Test(dataProvider = "BadBandPartitionData", expectedExceptions = IllegalArgumentException.class)
     public void testBadPartitionsThrowException(final List<Integer> partitions){
-        GVCFWriter.parsePartitions(partitions); // we should explode here
+        final MockWriter mockWriter = new MockWriter();
+        final GVCFWriter writer = new GVCFWriter(mockWriter, standardPartition, HomoSapiensConstants.DEFAULT_PLOIDY);
+        writer.parsePartitions(partitions); // we should explode here
     }
 
     @Test

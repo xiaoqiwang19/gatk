@@ -24,21 +24,21 @@ import static htsjdk.variant.vcf.VCFConstants.MAX_GENOTYPE_QUAL;
 /**
  * Genome-wide VCF writer
  */
-public final class GVCFWriter implements VariantContextWriter {
+public class GVCFWriter implements VariantContextWriter {
 
     public final static String GVCF_BLOCK = "GVCFBlock";
 
     /** Where we'll ultimately write our VCF records */
-    private final VariantContextWriter underlyingWriter;
+    protected final VariantContextWriter underlyingWriter;
 
-    private final RangeMap<Integer, Range<Integer>> gqPartitions;
+    protected final RangeMap<Integer, Range<Integer>> gqPartitions;
     private final int defaultPloidy;
 
     /** fields updated on the fly during GVCFWriter operation */
-    private int nextAvailableStart = -1;
-    private String contigOfNextAvailableStart = null;
-    private String sampleName = null;
-    private HomRefBlock currentBlock = null;
+    int nextAvailableStart = -1;
+    String contigOfNextAvailableStart = null;
+    String sampleName = null;
+    GVCFBlock currentBlock = null;
 
     /**
      * Create a new GVCF writer
@@ -74,7 +74,7 @@ public final class GVCFWriter implements VariantContextWriter {
      * @return a list of HomRefBlocks accepting bands of genotypes qualities split at the points specified in gqPartitions
      */
     @VisibleForTesting
-    static RangeMap<Integer,Range<Integer>> parsePartitions(final List<Integer> gqPartitions) {
+    public RangeMap<Integer,Range<Integer>> parsePartitions(final List<Integer> gqPartitions) {
         Utils.nonEmpty(gqPartitions);
         Utils.containsNoNull(gqPartitions, "The list of GQ partitions contains a null integer");
         final RangeMap<Integer, Range<Integer>> result = TreeRangeMap.create();
@@ -178,17 +178,18 @@ public final class GVCFWriter implements VariantContextWriter {
         return result;
     }
 
-    private boolean genotypeCanBeMergedInCurrentBlock(final Genotype g) {
-        return currentBlock != null
-                && currentBlock.withinBounds(Math.min(g.getGQ(), MAX_GENOTYPE_QUAL))
-                && currentBlock.getPloidy() == g.getPloidy()
-                && (currentBlock.getMinPLs() == null || !g.hasPL() || (currentBlock.getMinPLs().length == g.getPL().length));
+    boolean genotypeCanBeMergedInCurrentBlock(final Genotype g) {
+        final HomRefBlock currentHomRefBlock = (HomRefBlock)currentBlock;
+        return currentHomRefBlock != null
+                && currentHomRefBlock.withinBounds(Math.min(g.getGQ(), MAX_GENOTYPE_QUAL))
+                && currentHomRefBlock.getPloidy() == g.getPloidy()
+                && (currentHomRefBlock.getMinPLs() == null || !g.hasPL() || (currentHomRefBlock.getMinPLs().length == g.getPL().length));
     }
 
     /**
      * Flush the current hom-ref block, if necessary, to the underlying writer, and reset the currentBlock to null
      */
-    private void emitCurrentBlock() {
+    protected void emitCurrentBlock() {
         if (currentBlock != null) {
             underlyingWriter.add(currentBlock.toVariantContext(sampleName));
             currentBlock = null;
@@ -203,7 +204,7 @@ public final class GVCFWriter implements VariantContextWriter {
      * @param g  the genotype of the sample from vc that should be used to initialize the block
      * @return a newly allocated and initialized block containing g already
      */
-    private HomRefBlock createNewBlock(final VariantContext vc, final Genotype g) {
+    GVCFBlock createNewBlock(final VariantContext vc, final Genotype g) {
         // figure out the GQ limits to use based on the GQ of g
         final int gq = Math.min(g.getGQ(), MAX_GENOTYPE_QUAL);
         final Range<Integer> partition = gqPartitions.get(gq);

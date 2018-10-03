@@ -7,6 +7,8 @@ import org.broadinstitute.hellbender.engine.FeatureInput;
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.AssemblyBasedCallerArgumentCollection;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class M2ArgumentCollection extends AssemblyBasedCallerArgumentCollection {
     private static final long serialVersionUID = 9341L;
@@ -168,5 +170,26 @@ public class M2ArgumentCollection extends AssemblyBasedCallerArgumentCollection 
     @Advanced
     @Argument(fullName = GET_AF_FROM_AD_LONG_NAME, doc="Use allelic depth to calculate tumor allele fraction; recommended for mitochondrial applications", optional = true)
     public boolean calculateAFfromAD = false;
+
+    /**
+     * When HC is run in reference confidence mode with banding compression enabled (-ERC GVCF), homozygous-reference
+     * sites are compressed into bands of similar genotype quality (GQ) that are emitted as a single VCF record. See
+     * the FAQ documentation for more details about the GVCF format.
+     *
+     * This argument allows you to set the GQ bands. HC expects a list of strictly increasing GQ values
+     * that will act as exclusive upper bounds for the GQ bands. To pass multiple values,
+     * you provide them one by one with the argument, as in `-GQB 10 -GQB 20 -GQB 30` and so on
+     * (this would set the GQ bands to be `[0, 10), [10, 20), [20, 30)` and so on, for example).
+     * Note that GQ values are capped at 99 in the GATK, so values must be integers in [1, 100].
+     * If the last value is strictly less than 100, the last GQ band will start at that value (inclusive)
+     * and end at 100 (exclusive).
+     */
+    @Advanced
+    @Argument(fullName = "gvcf-lod-band", shortName = "LODB", doc= "Exclusive upper bounds for reference confidence LOD bands " +
+            "(must be > 0 and specified in increasing order)", optional = true)
+    public List<Integer> GVCFGQBands = new ArrayList<>(70);
+    {
+        GVCFGQBands.add(500); GVCFGQBands.add(1000); GVCFGQBands.add(1700); GVCFGQBands.add(1800); GVCFGQBands.add(1900); GVCFGQBands.add(2000);
+    };
 
 }

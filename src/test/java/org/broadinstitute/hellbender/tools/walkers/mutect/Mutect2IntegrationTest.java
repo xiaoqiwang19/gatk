@@ -14,10 +14,14 @@ import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.engine.FeatureDataSource;
 import org.broadinstitute.hellbender.testutils.ArgumentsBuilder;
 import org.broadinstitute.hellbender.testutils.VariantContextTestUtils;
+import org.broadinstitute.hellbender.testutils.CommandLineProgramTester;
 import org.broadinstitute.hellbender.tools.exome.orientationbiasvariantfilter.OrientationBiasUtils;
 import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.AssemblyBasedCallerArgumentCollection;
 import org.broadinstitute.hellbender.tools.walkers.validation.ConcordanceSummaryRecord;
+import org.broadinstitute.hellbender.tools.walkers.variantutils.ValidateVariants;
+import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.MathUtils;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.read.GATKRead;
 import org.broadinstitute.hellbender.utils.read.SAMFileGATKReadWriter;
@@ -518,6 +522,29 @@ public class Mutect2IntegrationTest extends CommandLineProgramTest {
                 "chrM:310-310 [T*, TC]",
                 "chrM:750-750 [A*, G]");
         Assert.assertTrue(expectedKeys.stream().allMatch(variantKeys::contains));
+    }
+
+    @Test
+    public void testMitochondrialRefConf() throws Exception {
+        Utils.resetRandomGenerator();
+        final File unfilteredVcf = createTempFile("unfiltered", ".vcf");
+
+        final List<String> args = Arrays.asList("-I", NA12878_MITO_BAM.getAbsolutePath(),
+                "-" + M2ArgumentCollection.TUMOR_SAMPLE_SHORT_NAME, "NA12878",
+                "-R", MITO_REF.getAbsolutePath(),
+                "-L", "chrM:1-1000",
+                "-min-pruning", "5",
+                "-O", unfilteredVcf.getAbsolutePath(),
+                "-ERC", "GVCF");
+        runCommandLine(args);
+
+        final CommandLineProgramTester validator = ValidateVariants.class::getSimpleName;
+        final ArgumentsBuilder args2 = new ArgumentsBuilder();
+        args2.addArgument("R", MITO_REF.getAbsolutePath());
+        args2.addArgument("V", unfilteredVcf.getAbsolutePath());
+        args2.addArgument("L", IntervalUtils.locatableToString(new SimpleInterval("chrM:1-1000")));
+        args2.add("-gvcf");
+        validator.runCommandLine(args2);  //will throw a UserException if GVCF isn't contiguous
     }
 
    @Test

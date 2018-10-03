@@ -3,6 +3,7 @@ package org.broadinstitute.hellbender.tools.walkers.mutect;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import org.broadinstitute.barclay.argparser.Argument;
 import org.broadinstitute.barclay.argparser.ArgumentCollection;
+import org.broadinstitute.barclay.argparser.CommandLineException;
 import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.barclay.help.DocumentedFeature;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
@@ -13,9 +14,11 @@ import org.broadinstitute.hellbender.tools.walkers.annotator.Annotation;
 import org.broadinstitute.hellbender.tools.walkers.annotator.ReadOrientationArtifact;
 import org.broadinstitute.hellbender.tools.walkers.annotator.ReferenceBases;
 import org.broadinstitute.hellbender.tools.walkers.annotator.VariantAnnotatorEngine;
+import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.ReferenceConfidenceMode;
 import org.broadinstitute.hellbender.transformers.ReadTransformer;
 import org.broadinstitute.hellbender.utils.downsampling.MutectDownsampler;
 import org.broadinstitute.hellbender.utils.downsampling.ReadsDownsampler;
+import org.broadinstitute.hellbender.utils.variant.writers.SomaticGVCFWriter;
 
 import java.io.File;
 import java.util.Collection;
@@ -190,6 +193,15 @@ public final class Mutect2 extends AssemblyRegionWalker {
         VariantAnnotatorEngine annotatorEngine = new VariantAnnotatorEngine(makeVariantAnnotations(), null, Collections.emptyList(), false);
         m2Engine = new Mutect2Engine(MTAC, createOutputBamIndex, createOutputBamMD5, getHeaderForReads(), referenceArguments.getReferenceFileName(), annotatorEngine);
         vcfWriter = createVCFWriter(outputVCF);
+        if (m2Engine.emitReferenceConfidence()) {
+            if ( MTAC.emitReferenceConfidence == ReferenceConfidenceMode.GVCF ) {
+                try {
+                    vcfWriter = new SomaticGVCFWriter(vcfWriter, MTAC.GVCFGQBands);
+                } catch ( IllegalArgumentException e ) {
+                    throw new CommandLineException.BadArgumentValue("GQBands", "are malformed: " + e.getMessage());
+                }
+            }
+        }
         m2Engine.writeHeader(vcfWriter, getDefaultToolVCFHeaderLines());
     }
 
