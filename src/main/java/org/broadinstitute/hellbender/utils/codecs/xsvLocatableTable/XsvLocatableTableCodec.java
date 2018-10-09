@@ -16,6 +16,7 @@ import org.apache.log4j.Logger;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.utils.Utils;
+import org.broadinstitute.hellbender.utils.codecs.AnnotatedIntervalCodec;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 
 import java.io.IOException;
@@ -167,7 +168,7 @@ public final class XsvLocatableTableCodec extends AsciiFeatureCodec<XsvTableFeat
     /**
      * Minus checking the file extension, can this class decode the given path.
      *
-     * TODO: This method should be inside an abstract superclass.  {@link XsvLocatableTableCodec} and {@link org.broadinstitute.hellbender.tools.copynumber.utils.annotatedinterval.AnnotatedIntervalCodec} should inherit.  See https://github.com/broadinstitute/gatk/issues/4580
+     * TODO: This method should be inside an abstract superclass.  {@link XsvLocatableTableCodec} and {@link AnnotatedIntervalCodec} should inherit.  See https://github.com/broadinstitute/gatk/issues/4580
      *
      * @param path File to check.  Never {@code null}
      * @return true if the file can be decoded.  False otherwise.

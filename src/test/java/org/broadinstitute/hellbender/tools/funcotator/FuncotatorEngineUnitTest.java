@@ -44,7 +44,7 @@ public class FuncotatorEngineUnitTest extends GATKBaseTest {
         final Pair<VCFHeader, List<VariantContext>> vcfFileContents = VariantContextTestUtils.readEntireVCFIntoMemory(vcfFile.getAbsolutePath());
 
         // Set up our arguments:
-        final FuncotatorArgumentCollection funcotatorArguments = new FuncotatorArgumentCollection();
+        final FuncotatorVariantArgumentCollection funcotatorArguments = new FuncotatorVariantArgumentCollection();
         funcotatorArguments.referenceVersion = FuncotatorArgumentDefinitions.HG19_REFERENCE_VERSION_STRING;
 
         // Create the metadata directly from the input.

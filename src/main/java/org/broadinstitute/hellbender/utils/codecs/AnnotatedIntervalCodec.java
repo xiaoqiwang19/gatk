@@ -1,4 +1,4 @@
-package org.broadinstitute.hellbender.tools.copynumber.utils.annotatedinterval;
+package org.broadinstitute.hellbender.utils.codecs;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMTextHeaderCodec;
@@ -7,6 +7,8 @@ import htsjdk.tribble.readers.LineIterator;
 import org.apache.commons.lang3.StringUtils;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.copynumber.utils.annotatedinterval.AnnotatedInterval;
+import org.broadinstitute.hellbender.tools.copynumber.utils.annotatedinterval.AnnotatedIntervalHeader;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.codecs.xsvLocatableTable.XsvLocatableTableCodec;
@@ -33,6 +35,7 @@ import java.util.stream.IntStream;
  *
  */
 public class AnnotatedIntervalCodec extends AsciiFeatureCodec<AnnotatedInterval> {
+    public static final String ANNOTATED_INTERVAL_DEFAULT_CONFIG_RESOURCE = "org/broadinstitute/hellbender/tools/copynumber/utils/annotatedinterval/annotated_region_default.config";
 
     public static final String CONTIG_COL_COMMENT = "_ContigHeader=";
     public static final String START_COL_COMMENT = "_StartHeader=";
@@ -41,9 +44,16 @@ public class AnnotatedIntervalCodec extends AsciiFeatureCodec<AnnotatedInterval>
     private XsvLocatableTableCodec xsvLocatableTableCodec;
     private AnnotatedIntervalHeader header;
 
+    /** Use the default config for tribble. */
     public AnnotatedIntervalCodec() {
         super(AnnotatedInterval.class);
-        xsvLocatableTableCodec = new XsvLocatableTableCodec();
+        final String resourcePath = ANNOTATED_INTERVAL_DEFAULT_CONFIG_RESOURCE;
+        try {
+            xsvLocatableTableCodec = new XsvLocatableTableCodec(Resource.getResourceContentsAsFile(resourcePath).toPath());
+        } catch (final IOException ioe) {
+            throw new GATKException.ShouldNeverReachHereException("Could not read config file: " + resourcePath,
+                    ioe);
+        }
     }
 
     public AnnotatedIntervalCodec(final Path overrideConfigFile) {
@@ -142,7 +152,7 @@ public class AnnotatedIntervalCodec extends AsciiFeatureCodec<AnnotatedInterval>
         Utils.nonNull(annotations);
 
         try {
-            final Path resourceFile = Resource.getResourceContentsAsFile(AnnotatedIntervalCollection.ANNOTATED_INTERVAL_DEFAULT_CONFIG_RESOURCE).toPath();
+            final Path resourceFile = Resource.getResourceContentsAsFile(ANNOTATED_INTERVAL_DEFAULT_CONFIG_RESOURCE).toPath();
             return createHeaderForWriter(resourceFile, annotations, samFileHeader);
         } catch (final IOException ioe) {
             throw new GATKException.ShouldNeverReachHereException("Could not load the default config file for annotated intervals.", ioe);

@@ -55,7 +55,7 @@ public final class FuncotatorEngine implements AutoCloseable {
     /**
      * The arguments given to the instance of the {@link GATKTool} running this {@link FuncotatorEngine}.
      */
-    private final FuncotatorArgumentCollection funcotatorArgs;
+    private final FuncotatorVariantArgumentCollection funcotatorArgs;
 
     /**
      * The {@link SAMSequenceDictionary} for the driving variants (i.e. the input variant file).
@@ -65,7 +65,7 @@ public final class FuncotatorEngine implements AutoCloseable {
     /**
      * Whether the input variant contigs must be converted to hg19.
      * This is only the case when the input reference is b37 AND when
-     * the reference version is hg19 (i.e. {@link FuncotatorArgumentCollection#referenceVersion} == {@link FuncotatorArgumentDefinitions#HG19_REFERENCE_VERSION_STRING}).
+     * the reference version is hg19 (i.e. {@link FuncotatorVariantArgumentCollection#referenceVersion} == {@link FuncotatorArgumentDefinitions#HG19_REFERENCE_VERSION_STRING}).
      */
     private final boolean mustConvertInputContigsToHg19;
 
@@ -76,7 +76,7 @@ public final class FuncotatorEngine implements AutoCloseable {
      * @param metadata {@link FuncotationMetadata} containing information on the kinds of {@link Funcotation}s this {@link FuncotatorEngine} will create.
      * @param funcotationFactories A {@link List<DataSourceFuncotationFactory>} which can create the desired {@link Funcotation}s.
      */
-    public FuncotatorEngine(final FuncotatorArgumentCollection funcotatorArgs,
+    public FuncotatorEngine(final FuncotatorVariantArgumentCollection funcotatorArgs,
                             final SAMSequenceDictionary sequenceDictionaryForDrivingVariants,
                             final FuncotationMetadata metadata,
                             final List<DataSourceFuncotationFactory> funcotationFactories) {

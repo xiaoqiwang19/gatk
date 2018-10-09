@@ -1,12 +1,7 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
-import org.broadinstitute.barclay.argparser.Advanced;
 import org.broadinstitute.barclay.argparser.Argument;
-import org.broadinstitute.barclay.argparser.Hidden;
-import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 
-import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -14,41 +9,26 @@ import java.util.Set;
 
 /**
  * Arguments to be be used by the {@link Funcotator} {@link org.broadinstitute.hellbender.engine.GATKTool},
- * which are specific to {@link Funcotator}.
+ * which are specific to {@link Funcotator}.  Use this collection for small mutations (SNP, Indel)
  * Created by jonn on 9/12/18.
  */
-public class FuncotatorArgumentCollection implements Serializable {
+public class FuncotatorVariantArgumentCollection extends BaseFuncotatorArgumentCollection {
     private static final long serialVersionUID = 1L;
 
     //-----------------------------------------------------
     // Required args:
-
-    @Argument(
-            shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME,
-            fullName  = StandardArgumentDefinitions.OUTPUT_LONG_NAME,
-            doc = "Output VCF file to which annotated variants should be written.")
-    public File outputFile;
-
-    @Argument(
-            fullName =  FuncotatorArgumentDefinitions.REFERENCE_VERSION_LONG_NAME,
-            doc = "The version of the Human Genome reference to use (e.g. hg19, hg38, etc.).  This will correspond to a sub-folder of each data source corresponding to that data source for the given reference."
-    )
-    public String referenceVersion;
-
-    @Argument(
-            fullName =  FuncotatorArgumentDefinitions.DATA_SOURCES_PATH_LONG_NAME,
-            doc = "The path to a data source folder for Funcotator.  May be specified more than once to handle multiple data source folders."
-    )
-    public List<String> dataSourceDirectories;
+    // (See superclass for more)
 
     @Argument(
             fullName =  FuncotatorArgumentDefinitions.OUTPUT_FORMAT_LONG_NAME,
-            doc = "The output file format.  Either VCF or MAF.  Please note that MAF output for germline use case VCFs is unsupported."
+            doc = "The output file format.  Either VCF, MAF, or SEG.  Please note that MAF output for germline use case VCFs is unsupported.  SEG will generate two output files: a simple tsv and a gene list."
     )
     public FuncotatorArgumentDefinitions.OutputFormatType outputFormatType;
 
+
     //-----------------------------------------------------
     // Optional args:
+    // (See superclass for more)
 
     @Argument(
             fullName = FuncotatorArgumentDefinitions.REMOVE_FILTERED_VARIANTS_LONG_NAME,
@@ -93,19 +73,5 @@ public class FuncotatorArgumentCollection implements Serializable {
     )
     public int lookaheadFeatureCachingInBp = FuncotatorArgumentDefinitions.LOOKAHEAD_CACHE_IN_BP_DEFAULT_VALUE;
 
-    @Advanced
-    @Hidden
-    @Argument(
-            fullName = FuncotatorArgumentDefinitions.FORCE_B37_TO_HG19_REFERENCE_CONTIG_CONVERSION,
-            optional = true,
-            doc = "(Advanced / DO NOT USE*) If you select this flag, Funcotator will force a conversion of variant contig names from b37 to hg19.  *This option is useful in integration tests (written by devs) only."
-    )
-    public boolean forceB37ToHg19ContigNameConversion = false;
 
-    @Argument(
-            fullName  = FuncotatorArgumentDefinitions.EXCLUSION_FIELDS_LONG_NAME,
-            optional = true,
-            doc = "Fields that should not be rendered in the final output.  Only exact name matches will be excluded."
-    )
-    public Set<String> excludedFields = new HashSet<>();
 }

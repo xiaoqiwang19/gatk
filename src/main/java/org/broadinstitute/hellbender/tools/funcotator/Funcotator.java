@@ -11,15 +11,13 @@ import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.barclay.help.DocumentedFeature;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.engine.*;
-import org.broadinstitute.hellbender.engine.filters.VariantFilter;
 import org.broadinstitute.hellbender.engine.filters.CountingVariantFilter;
-import org.broadinstitute.hellbender.engine.filters.VariantFilterLibrary;
-import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.DataSourceUtils;
 import org.broadinstitute.hellbender.tools.funcotator.metadata.VcfFuncotationMetadata;
 import org.broadinstitute.hellbender.transformers.VariantTransformer;
 import org.broadinstitute.hellbender.utils.SequenceDictionaryUtils;
+import org.broadinstitute.hellbender.utils.Utils;
 import picard.cmdline.programgroups.VariantEvaluationProgramGroup;
 
 import java.nio.file.Path;
@@ -209,7 +207,7 @@ public class Funcotator extends VariantWalker {
     // Arguments:
 
     @ArgumentCollection
-    private final FuncotatorArgumentCollection funcotatorArgs = new FuncotatorArgumentCollection();
+    private final FuncotatorVariantArgumentCollection funcotatorArgs = new FuncotatorVariantArgumentCollection();
 
     //==================================================================================================================
 
@@ -222,7 +220,7 @@ public class Funcotator extends VariantWalker {
     /**
      * @return The {@link Funcotator}-specific arguments used to instantiate this {@link Funcotator} instance.
      */
-    public FuncotatorArgumentCollection getArguments() {
+    public FuncotatorVariantArgumentCollection getArguments() {
         return funcotatorArgs;
     }
 
@@ -243,6 +241,10 @@ public class Funcotator extends VariantWalker {
             // Ensure that the reference dictionary is a superset of the variant dictionary:
             checkReferenceDictionaryIsSupersetOfVariantDictionary();
         }
+
+        Utils.validateArg(funcotatorArgs.outputFormatType != FuncotatorArgumentDefinitions.OutputFormatType.SEG,
+                "This tool does not support segment output.  Please see FuncotateSegments.");
+
 
         // Next set up our transcript list:
         final Set<String> finalUserTranscriptIdSet = FuncotatorEngine.processTranscriptList(funcotatorArgs.userTranscriptIdSet);
