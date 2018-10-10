@@ -11,6 +11,7 @@ import org.broadinstitute.hellbender.engine.FeatureInput;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
+import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
 import java.io.Closeable;
 import java.util.*;
@@ -181,14 +182,7 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
 
         // If our featureList is compatible with this DataSourceFuncotationFactory, then we make our funcotations:
         if ( isFeatureListCompatible(featureList) ) {
-
-            // Create our funcotations:
-            if ( gencodeFuncotations == null ) {
-                outputFuncotations = createFuncotationsOnVariant(variant, referenceContext, featureList);
-            }
-            else {
-                outputFuncotations = createFuncotationsOnVariant(variant, referenceContext, featureList, gencodeFuncotations);
-            }
+            outputFuncotations = determineFuncotations(variant, referenceContext, featureList, gencodeFuncotations);
 
             // Set our overrides:
             setOverrideValuesInFuncotations(outputFuncotations);
@@ -202,6 +196,23 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
         } else {
             return outputFuncotations;
         }
+    }
+
+    private List<Funcotation> determineFuncotations(final VariantContext variant, final ReferenceContext referenceContext, final List<Feature> featureList, final List<GencodeFuncotation> gencodeFuncotations) {
+        // Create our funcotations:
+        List<Funcotation> outputFuncotations;
+
+        if (GATKVariantContextUtils.isStructuralVariantContext(variant)) {
+            outputFuncotations = createFuncotationsOnSegment(variant, referenceContext, featureList);
+        } else {
+
+            if (gencodeFuncotations == null) {
+                outputFuncotations = createFuncotationsOnVariant(variant, referenceContext, featureList);
+            } else {
+                outputFuncotations = createFuncotationsOnVariant(variant, referenceContext, featureList, gencodeFuncotations);
+            }
+        }
+        return outputFuncotations;
     }
 
     /**

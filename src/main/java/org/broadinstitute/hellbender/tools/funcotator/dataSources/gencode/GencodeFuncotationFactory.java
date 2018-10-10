@@ -9,6 +9,8 @@ import htsjdk.tribble.Feature;
 import htsjdk.tribble.annotation.Strand;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.vcf.VCFHeaderLineType;
+import htsjdk.variant.vcf.VCFInfoHeaderLine;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.hellbender.engine.FeatureInput;
@@ -17,6 +19,9 @@ import org.broadinstitute.hellbender.engine.ReferenceDataSource;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.funcotator.*;
+import org.broadinstitute.hellbender.tools.funcotator.dataSources.TableFuncotation;
+import org.broadinstitute.hellbender.tools.funcotator.metadata.FuncotationMetadata;
+import org.broadinstitute.hellbender.tools.funcotator.metadata.VcfFuncotationMetadata;
 import org.broadinstitute.hellbender.utils.BaseUtils;
 import org.broadinstitute.hellbender.utils.GATKProtectedVariantContextUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -25,6 +30,7 @@ import org.broadinstitute.hellbender.utils.codecs.gencode.*;
 import org.broadinstitute.hellbender.utils.param.ParamUtils;
 import org.broadinstitute.hellbender.utils.read.ReadUtils;
 import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
+import org.sqlite.util.StringUtils;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -2208,16 +2214,53 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
 
     @Override
     public LinkedHashSet<String> getSupportedFuncotationFieldsForSegments() {
-        return super.getSupportedFuncotationFieldsForSegments();
+        // TODO: Many more to add here
+        return new LinkedHashSet<>(Arrays.asList(
+                getName() + "_" + getVersion() + "_genes"
+        ));
+    }
+
+    // TODO: Docs
+    private FuncotationMetadata createSegmentFuncotationMetadata() {
+        return VcfFuncotationMetadata.create(
+                Collections.singletonList(new VCFInfoHeaderLine(getName() + "_" + getVersion() + "_genes",
+                        1, VCFHeaderLineType.String, "The genes overlapping the segment."))
+        );
     }
 
     @Override
     public boolean isSupportingSegmentFuncotation() {
-        return super.isSupportingSegmentFuncotation();
+        return true;
     }
 
+    /**
+     * TODO: Docs
+     * @param segmentVariantContext
+     * @param referenceContext
+     * @param gencodeGtfGeneFeaturesAsFeatures These must be GencodeGeneGtfFeatures.  Assumed to overlap the entire segment, not just the endpoints.
+     * @return
+     */
     @Override
-    public List<Funcotation> createFuncotationsOnSegment(final VariantContext segmentVariantContext, final ReferenceContext referenceContext, final List<Feature> featureList) {
-        return super.createFuncotationsOnSegment(segmentVariantContext, referenceContext, featureList);
+    public List<Funcotation> createFuncotationsOnSegment(final VariantContext segmentVariantContext, final ReferenceContext referenceContext, final List<Feature> gencodeGtfGeneFeaturesAsFeatures) {
+
+        Utils.validateArg(this.transcriptSelectionMode != TranscriptSelectionMode.ALL, "Cannot create funcotations on segments if the selection mode is " + TranscriptSelectionMode.ALL);
+
+        final List<GencodeGtfGeneFeature> geneFeatures = gencodeGtfGeneFeaturesAsFeatures.stream().map(g -> (GencodeGtfGeneFeature) g).collect(Collectors.toList());
+
+        // Create a funcotation for the start position of the segment.  Using the ref allele as the ref and the alt.
+        final List<GencodeGtfTranscriptFeature> allBasicTranscripts = geneFeatures.stream().flatMap(gf -> gf.getTranscripts().stream())
+                .filter(GencodeFuncotationFactory::isBasic).collect(Collectors.toList());
+
+        // Get the genes funcotation field
+        final List<String> genes = retrieveGeneNamesFromTranscripts(allBasicTranscripts).stream().sorted().collect(Collectors.toList());
+        // TODO: Fix magic constants.
+        final Funcotation result = TableFuncotation.create(Collections.singletonList(getName() + "_" + getVersion() + "_genes"), Collections.singletonList(StringUtils.join(genes, ",")),
+            segmentVariantContext.getAlternateAllele(0), getName(), createSegmentFuncotationMetadata());
+
+        return Collections.singletonList(result);
+    }
+
+    private static Set<String> retrieveGeneNamesFromTranscripts(final List<GencodeGtfTranscriptFeature> txs) {
+        return txs.stream().map(tx -> tx.getGeneName()).collect(Collectors.toSet());
     }
 }

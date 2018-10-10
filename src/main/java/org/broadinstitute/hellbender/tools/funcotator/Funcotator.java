@@ -323,7 +323,7 @@ public class Funcotator extends VariantWalker {
 
     @Override
     protected CountingVariantFilter makeVariantFilter() {
-        return new CountingVariantFilter(funcotatorEngine.makeVariantFilter());
+        return new CountingVariantFilter(funcotatorEngine.makeVariantFilter(funcotatorArgs.removeFilteredVariants));
     }
 
     @Override

@@ -19,6 +19,7 @@ import org.broadinstitute.hellbender.tools.funcotator.dataSources.DataSourceUtil
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
 import org.broadinstitute.hellbender.tools.funcotator.mafOutput.MafOutputRenderer;
 import org.broadinstitute.hellbender.tools.funcotator.metadata.FuncotationMetadata;
+import org.broadinstitute.hellbender.tools.funcotator.simpletsvoutput.SimpleTsvOutputRenderer;
 import org.broadinstitute.hellbender.tools.funcotator.vcfOutput.VcfOutputRenderer;
 import org.broadinstitute.hellbender.transformers.VariantTransformer;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -55,7 +56,7 @@ public final class FuncotatorEngine implements AutoCloseable {
     /**
      * The arguments given to the instance of the {@link GATKTool} running this {@link FuncotatorEngine}.
      */
-    private final FuncotatorVariantArgumentCollection funcotatorArgs;
+    private final BaseFuncotatorArgumentCollection funcotatorArgs;
 
     /**
      * The {@link SAMSequenceDictionary} for the driving variants (i.e. the input variant file).
@@ -73,10 +74,11 @@ public final class FuncotatorEngine implements AutoCloseable {
      * Create a {@link FuncotatorEngine} using the given {@code metadata} and {@code funcotationFactories} representing
      * the kinds of {@link Funcotation}s to be created and the data sources from which they should be created,
      * respectively.
-     * @param metadata {@link FuncotationMetadata} containing information on the kinds of {@link Funcotation}s this {@link FuncotatorEngine} will create.
+     * @param metadata {@link FuncotationMetadata} containing information on the kinds of {@link Funcotation}s this {@link FuncotatorEngine} will create to represent the input file.
+     *          For example, this could be based on the existing annotations for an input VCF.
      * @param funcotationFactories A {@link List<DataSourceFuncotationFactory>} which can create the desired {@link Funcotation}s.
      */
-    public FuncotatorEngine(final FuncotatorVariantArgumentCollection funcotatorArgs,
+    public FuncotatorEngine(final BaseFuncotatorArgumentCollection funcotatorArgs,
                             final SAMSequenceDictionary sequenceDictionaryForDrivingVariants,
                             final FuncotationMetadata metadata,
                             final List<DataSourceFuncotationFactory> funcotationFactories) {
@@ -206,6 +208,15 @@ public final class FuncotatorEngine implements AutoCloseable {
                         defaultToolVcfHeaderLines, funcotatorArgs.excludedFields
                 );
                 break;
+            case SEG:
+                outputRenderer = new SimpleTsvOutputRenderer(funcotatorArgs.outputFile.toPath(),
+                        getFuncotationFactories(),
+                        headerForVariants,
+                        unaccountedForDefaultAnnotations,
+                        unaccountedForOverrideAnnotations,
+                        defaultToolVcfHeaderLines.stream().map(Object::toString).collect(Collectors.toCollection(LinkedHashSet::new)),
+                        funcotatorArgs.referenceVersion, funcotatorArgs.excludedFields);
+                break;
             default:
                 throw new GATKException("Unsupported output format type specified: " + funcotatorArgs.outputFormatType.toString());
         }
@@ -216,9 +227,9 @@ public final class FuncotatorEngine implements AutoCloseable {
     /**
      * @return A {@link VariantFilter} that will ignore any variants that have been filtered (if the user requested that the filter is turned on).  Otherwise returns a no-op filter.
      */
-    public VariantFilter makeVariantFilter() {
-        // Ignore variants that have been filtered if the user requests it:
-        return funcotatorArgs.removeFilteredVariants ?
+    public static VariantFilter makeVariantFilter(final boolean isRemovingFilteredVariants) {
+        // Ignore variants that have been filtered if the requested:
+        return isRemovingFilteredVariants ?
                 VariantFilterLibrary.PASSES_FILTERS :
                 VariantFilterLibrary.ALLOW_ALL_VARIANTS;
     }
