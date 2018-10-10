@@ -9,6 +9,7 @@ import org.broadinstitute.barclay.utils.Utils;
 import org.broadinstitute.hellbender.engine.FeatureContext;
 import org.broadinstitute.hellbender.engine.FeatureInput;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
+import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
 
 import java.io.Closeable;
@@ -17,6 +18,12 @@ import java.util.*;
 /**
  * An abstract class to allow for the creation of a {@link Funcotation} for a given data source.
  * Created by jonn on 8/30/17.
+ *
+ * Subclasses that support the annotation of segments must override:
+ *  getSupportedFuncotationFieldsForSegments()
+ *  isSupportingSegmentFuncotation()
+ *  createFuncotationsOnSegment(...)
+ *
  */
 public abstract class DataSourceFuncotationFactory implements Closeable {
 
@@ -129,6 +136,13 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
      * @return An ordered {@link LinkedHashSet} of the names of annotations that this Data Source supports.
      */
     public abstract LinkedHashSet<String> getSupportedFuncotationFields();
+
+    /**
+     * @return An ordered {@link LinkedHashSet} of the names of annotations that this Data Source supports when annotating segments.
+     */
+    public LinkedHashSet<String> getSupportedFuncotationFieldsForSegments() {
+        return new LinkedHashSet<>();
+    }
 
     /**
      * Creates a {@link List} of {@link Funcotation} for the given {@code variant}, {@code referenceContext}, and {@code featureContext}.
@@ -247,4 +261,24 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
      */
     @VisibleForTesting
     public abstract Class<? extends Feature> getAnnotationFeatureClass();
+
+    /**
+     * @return Whether this funcotation factory can support creating funcotations from segments.
+     */
+    public boolean isSupportingSegmentFuncotation() {
+        return false;
+    }
+
+    /** TODO: Docs
+     *
+     * @param segmentVariantContext
+     * @param referenceContext
+     * @param featureList
+     * @return
+     */
+    public List<Funcotation> createFuncotationsOnSegment(final VariantContext segmentVariantContext,
+                                                         final ReferenceContext referenceContext,
+                                                         final List<Feature> featureList) {
+        throw new GATKException.ShouldNeverReachHereException("This funcotation factory does not support the annotation of segments.");
+    }
 }

@@ -408,4 +408,17 @@ public class LocatableXsvFuncotationFactoryUnitTest extends GATKBaseTest {
             writer.println("            end_column = 2");
         }
     }
+
+    @Test(expectedExceptions = GATKException.ShouldNeverReachHereException.class)
+    public void testNoSupportOfSegments() {
+        final LocatableXsvFuncotationFactory factory = new LocatableXsvFuncotationFactory(LocatableXsvFuncotationFactory.DEFAULT_NAME, DataSourceFuncotationFactory.DEFAULT_VERSION_STRING, new LinkedHashMap<>(), null);
+
+        Assert.assertFalse(factory.isSupportingSegmentFuncotation());
+        Assert.assertEquals(factory.getSupportedFuncotationFieldsForSegments(), Collections.emptyList());
+        final SimpleInterval fakeInterval = new SimpleInterval("1", 100, 100);
+        final List<Funcotation> funcotations = factory.createFuncotationsOnSegment(
+                createVariantContext(fakeInterval.getContig(), fakeInterval.getStart(), fakeInterval.getEnd(),
+                        "T", "A", FuncotatorReferenceTestUtils.retrieveHg19Chr3Ref()),
+                new ReferenceContext( referenceDataSourceMap.get(FuncotatorReferenceTestUtils.retrieveHg19Chr3Ref()), fakeInterval), Collections.emptyList());
+    }
 }

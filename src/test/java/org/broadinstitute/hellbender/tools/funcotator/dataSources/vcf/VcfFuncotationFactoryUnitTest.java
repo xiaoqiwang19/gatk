@@ -15,6 +15,7 @@ import org.broadinstitute.hellbender.GATKBaseTest;
 import org.broadinstitute.hellbender.engine.FeatureInput;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.engine.ReferenceDataSource;
+import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.testutils.FuncotatorReferenceTestUtils;
 import org.broadinstitute.hellbender.testutils.VariantContextTestUtils;
 import org.broadinstitute.hellbender.tools.funcotator.Funcotation;
@@ -451,5 +452,17 @@ public class VcfFuncotationFactoryUnitTest extends GATKBaseTest {
                                                               final String version,
                                                               final Path sourceFilePath) {
         return new VcfFuncotationFactory(name, version, sourceFilePath, new LinkedHashMap<>(), new FeatureInput<VariantContext>(sourceFilePath.toString(), name, new HashMap<>()));
+    }
+
+    @Test(expectedExceptions = GATKException.ShouldNeverReachHereException.class)
+    public void testNoSupportOfSegments() {
+        final VcfFuncotationFactory factory = createVcfFuncotationFactory("FAKE", "MOCK1", IOUtils.getPath(EXAC_SNIPPET));
+
+        Assert.assertFalse(factory.isSupportingSegmentFuncotation());
+        Assert.assertEquals(factory.getSupportedFuncotationFieldsForSegments(), Collections.emptyList());
+        final Triple<VariantContext, ReferenceContext, List<Feature>> triplet = createDummyCacheTriples(Arrays.asList("G", "C"), 0);
+
+        final List<Funcotation> funcotations = factory.createFuncotationsOnSegment(triplet.getLeft(),
+                triplet.getMiddle(), Collections.emptyList());
     }
 }
