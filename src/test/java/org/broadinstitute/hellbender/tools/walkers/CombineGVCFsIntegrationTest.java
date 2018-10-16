@@ -34,6 +34,7 @@ public class CombineGVCFsIntegrationTest extends CommandLineProgramTest {
     private static final List<String> ATTRIBUTES_TO_IGNORE = Arrays.asList(
             "RAW_MQ"); //MQ data format and key have changed since GATK3
     private static final File NA12878_HG37 = new File(toolsTestDir + "haplotypecaller/expected.testGVCFMode.gatk4.g.vcf");
+    private static final File MITO_REF = new File(toolsTestDir, "mutect/mito/Homo_sapiens_assembly38.mt_only.fasta");
 
 
     private static <T> void assertForEachElementInLists(final List<T> actual, final List<T> expected, final BiConsumer<T, T> assertion) {
@@ -421,6 +422,17 @@ public class CombineGVCFsIntegrationTest extends CommandLineProgramTest {
         args.addReference(new File(b37_reference_20_21));
         args.addOutput(output);
         args.addVCF(getTestFile("mnp.g.vcf"));
+        runCommandLine(args);
+    }
+
+    @Test
+    public void testCombineSomaticGvcfs() throws Exception {
+        final File output = createTempFile("combinegvcfs", ".vcf");
+        final ArgumentsBuilder args = new ArgumentsBuilder();
+        args.addReference(MITO_REF);
+        args.addOutput(output);
+        args.addVCF(getTestFile("sample1.MT.g.vcf"));
+        args.addVCF(getTestFile("sample2.MT.g.vcf"));
         runCommandLine(args);
     }
 }

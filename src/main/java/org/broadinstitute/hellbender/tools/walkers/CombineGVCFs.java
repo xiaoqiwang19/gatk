@@ -25,6 +25,7 @@ import org.broadinstitute.hellbender.tools.walkers.annotator.VariantAnnotatorEng
 import org.broadinstitute.hellbender.utils.IntervalUtils;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.genotyper.IndexedSampleList;
+import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
 import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 
 import java.io.File;
@@ -80,6 +81,7 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
 
     public static final String BP_RES_LONG_NAME = "convert-to-base-pair-resolution";
     public static final String BREAK_BANDS_LONG_NAME = "break-bands-at-multiples-of";
+    public static final String USE_SOMATIC_LONG_NAME = "use-somatic-merging";
 
     @Argument(fullName= StandardArgumentDefinitions.OUTPUT_LONG_NAME,
             shortName=StandardArgumentDefinitions.OUTPUT_SHORT_NAME,
@@ -98,6 +100,13 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
      */
     @Argument(fullName=BREAK_BANDS_LONG_NAME, doc = "If > 0, reference bands will be broken up at genomic positions that are multiples of this number", optional=true)
     protected int multipleAtWhichToBreakBands = 0;
+
+    /**
+     * Merge somatic GVCFs, retaining LOD and haplotype event count information in FORMAT field
+     * @return
+     */
+    @Argument(fullName=USE_SOMATIC_LONG_NAME, doc = "Merge input GVCFs according to somatic (i.e. Mutect2) annotations")
+    protected boolean somaticInput = false;
 
     @Override
     public boolean useVariantAnnotations() { return true;}
@@ -238,7 +247,7 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
 
         vcfWriter = getVCFWriter();
 
-        referenceConfidenceVariantContextMerger = new ReferenceConfidenceVariantContextMerger(annotationEngine, getHeaderForVariants());
+        referenceConfidenceVariantContextMerger = new ReferenceConfidenceVariantContextMerger(annotationEngine, getHeaderForVariants(), somaticInput);
 
         //now that we have all the VCF headers, initialize the annotations (this is particularly important to turn off RankSumTest dithering in integration tests)'
         sequenceDictionary = getBestAvailableSequenceDictionary();
@@ -406,9 +415,17 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
 
         // genotypes
         final GenotypesContext genotypes = GenotypesContext.create();
-        for ( final VariantContext vc : vcs ) {
-            for ( final Genotype g : vc.getGenotypes() ) {
-                genotypes.add(new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy())).make());
+        for (final VariantContext vc : vcs) {
+            for (final Genotype g : vc.getGenotypes()) {
+                if (!somaticInput) {
+                    genotypes.add(new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy())).make());
+                }
+                else {
+                    genotypes.add(new GenotypeBuilder(g)
+                            .attribute(GATKVCFConstants.TUMOR_LOD_KEY, vc.getAttribute(GATKVCFConstants.TUMOR_LOD_KEY).toString())
+                            .attribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY, vc.getAttribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY).toString())
+                            .make());
+                }
             }
         }
 

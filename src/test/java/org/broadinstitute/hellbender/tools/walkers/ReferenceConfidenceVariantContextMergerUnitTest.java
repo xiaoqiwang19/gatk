@@ -46,7 +46,7 @@ public class ReferenceConfidenceVariantContextMergerUnitTest extends GATKBaseTes
     @Test(dataProvider = "referenceConfidenceMergeData")
     public void testReferenceConfidenceMerge(final String testID, final List<VariantContext> toMerge, final Locatable loc,
                                              final boolean returnSiteEvenIfMonomorphic, final boolean uniquifySamples, final VariantContext expectedResult) {
-        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader());
+        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader(), false);
         final VariantContext result = merger.merge(toMerge, loc, returnSiteEvenIfMonomorphic ? (byte) 'A' : null, true, uniquifySamples);
         if ( result == null ) {
             Assert.assertTrue(expectedResult == null);
@@ -90,7 +90,7 @@ public class ReferenceConfidenceVariantContextMergerUnitTest extends GATKBaseTes
 
     @Test(expectedExceptions = UserException.class)
     public void testGetIndexesOfRelevantAllelesWithNoALT() {
-        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader());
+        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader(), false);
 
         final List<Allele> alleles1 = new ArrayList<>(1);
         alleles1.add(Allele.create("A", true));
@@ -104,7 +104,7 @@ public class ReferenceConfidenceVariantContextMergerUnitTest extends GATKBaseTes
     @Test(dataProvider = "getIndexesOfRelevantAllelesData")
     public void testGetIndexesOfRelevantAlleles(final int allelesIndex, final List<Allele> allAlleles) {
         final List<Allele> myAlleles = new ArrayList<>(3);
-        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader());
+        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader(), false);
 
         // always add the reference and <ALT> alleles
         myAlleles.add(allAlleles.get(0));
@@ -135,7 +135,7 @@ public class ReferenceConfidenceVariantContextMergerUnitTest extends GATKBaseTes
     // referenceConfidenceVariantContextMerger.
     @Test (dataProvider = "getIndexesOfRelevantAllelesDataSpanningDels")
     public void testGetIndexesOfRelevantAllelesMultiSpanningDel(final List<Allele> allelesToFind, final List<Allele> allAlleles, final Genotype g, final int expectedIndex) {
-        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader());
+        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), new VCFHeader(), false);
 
         final int[] indexes = merger.getIndexesOfRelevantAlleles(allAlleles, allelesToFind,-1, g);
 
@@ -412,7 +412,7 @@ public class ReferenceConfidenceVariantContextMergerUnitTest extends GATKBaseTes
         toMergeVCs.add(vcBuilder.attributes(attributes3).make());
 
         // merge and make sure we get the median value
-        final ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), vcfHeader);
+        final ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(getAnnotationEngine(), vcfHeader, false);
         final VariantContext mergedVC = merger.merge(
                 toMergeVCs,
                 new SimpleInterval("20", 10, 10),

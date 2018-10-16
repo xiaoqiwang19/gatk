@@ -12,6 +12,7 @@ import org.broadinstitute.hellbender.tools.walkers.annotator.allelespecific.Alle
 import org.broadinstitute.hellbender.tools.walkers.annotator.allelespecific.ReducibleAnnotationData;
 import org.broadinstitute.hellbender.tools.walkers.genotyper.GenotypeLikelihoodCalculator;
 import org.broadinstitute.hellbender.tools.walkers.genotyper.GenotypeLikelihoodCalculators;
+import org.broadinstitute.hellbender.utils.GATKProtectedVariantContextUtils;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.logging.OneShotLogger;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
@@ -32,15 +33,17 @@ public final class ReferenceConfidenceVariantContextMerger {
     private final GenotypeLikelihoodCalculators calculators;
     private final VCFHeader vcfInputHeader;
     protected final VariantAnnotatorEngine annotatorEngine;
+    private final boolean doSomaticMerge;
     protected final OneShotLogger oneShotAnnotationLogger = new OneShotLogger(this.getClass());
     protected final OneShotLogger oneShotHeaderLineLogger = new OneShotLogger(this.getClass());
 
-    public ReferenceConfidenceVariantContextMerger(VariantAnnotatorEngine engine, final VCFHeader inputHeader) {
+    public ReferenceConfidenceVariantContextMerger(VariantAnnotatorEngine engine, final VCFHeader inputHeader, boolean somaticInput) {
         Utils.nonNull(inputHeader, "A VCF header must be provided");
 
         calculators = new GenotypeLikelihoodCalculators();
         annotatorEngine = engine;
         vcfInputHeader = inputHeader;
+        doSomaticMerge = somaticInput;
     }
 
     /**
@@ -74,7 +77,7 @@ public final class ReferenceConfidenceVariantContextMerger {
         for ( final VariantContext vc : vcs ) {
             // if this context doesn't start at the current location then it must be a spanning event (deletion or ref block)
             final boolean isSpanningEvent = loc.getStart() != vc.getStart();
-            vcAndNewAllelePairs.add(new VCWithNewAlleles(vc, isSpanningEvent ? replaceWithNoCallsAndDels(vc) : remapAlleles(vc, refAllele), isSpanningEvent));
+            vcAndNewAllelePairs.add(new VCWithNewAlleles(vc, isSpanningEvent ? replaceWithNoCallsAndDels(vc, doSomaticMerge) : remapAlleles(vc, refAllele), isSpanningEvent));
         }
 
         final List<Allele> allelesList = collectTargetAlleles(vcAndNewAllelePairs, refAllele, removeNonRefSymbolicAllele);
@@ -127,9 +130,10 @@ public final class ReferenceConfidenceVariantContextMerger {
      * Replaces any alleles in the VariantContext with NO CALLS or the symbolic deletion allele as appropriate, except for the generic ALT allele
      *
      * @param vc   VariantContext with the alleles to replace
+     * @param doSomaticMerge
      * @return non-null list of alleles
      */
-    private static List<Allele> replaceWithNoCallsAndDels(final VariantContext vc) {
+    private static List<Allele> replaceWithNoCallsAndDels(final VariantContext vc, boolean doSomaticMerge) {
         Utils.nonNull(vc);
 
         final List<Allele> result = new ArrayList<>(vc.getNAlleles());
@@ -142,7 +146,7 @@ public final class ReferenceConfidenceVariantContextMerger {
             final Allele replacement;
             if ( allele.equals(Allele.NON_REF_ALLELE) ) {
                 replacement = allele;
-            } else if ( allele.length() < vc.getReference().length() ) {
+            } else if ( !doSomaticMerge && allele.length() < vc.getReference().length() ) {
                 replacement = Allele.SPAN_DEL;
             } else {
                 replacement = Allele.NO_CALL;
@@ -471,15 +475,24 @@ public final class ReferenceConfidenceVariantContextMerger {
             final int ploidy = g.getPloidy();
             final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy()));
             genotypeBuilder.name(name);
-            if (g.hasPL()) {
-                // lazy initialization of the genotype index map by ploidy.
-                perSampleIndexesOfRelevantAlleles = getIndexesOfRelevantAlleles(remappedAlleles, targetAlleles, vc.getStart(), g);
-                final int[] genotypeIndexMapByPloidy = genotypeIndexMapsByPloidy[ploidy] == null
+            if (!doSomaticMerge) {
+                if (g.hasPL()) {
+                    // lazy initialization of the genotype index map by ploidy.
+                    perSampleIndexesOfRelevantAlleles = getIndexesOfRelevantAlleles(remappedAlleles, targetAlleles, vc.getStart(), g);
+                    final int[] genotypeIndexMapByPloidy = genotypeIndexMapsByPloidy[ploidy] == null
                             ? calculators.getInstance(ploidy, maximumAlleleCount).genotypeIndexMap(perSampleIndexesOfRelevantAlleles, calculators) //probably horribly slow
                             : genotypeIndexMapsByPloidy[ploidy];
-                final int[] PLs = generatePL(g, genotypeIndexMapByPloidy);
+                    final int[] PLs = generatePL(g, genotypeIndexMapByPloidy);
+                    final int[] AD = g.hasAD() ? generateAD(g.getAD(), perSampleIndexesOfRelevantAlleles) : null;
+                    genotypeBuilder.PL(PLs).AD(AD);
+                }
+            }
+            else {
+                // lazy initialization of the genotype index map by ploidy.
+                perSampleIndexesOfRelevantAlleles = getIndexesOfRelevantAlleles(remappedAlleles, targetAlleles, vc.getStart(), g);
                 final int[] AD = g.hasAD() ? generateAD(g.getAD(), perSampleIndexesOfRelevantAlleles) : null;
-                genotypeBuilder.PL(PLs).AD(AD);
+                final double[] TLODs = g.hasExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY) ? generateTLODVector(g, perSampleIndexesOfRelevantAlleles) : null;
+                genotypeBuilder.AD(AD).attribute(GATKVCFConstants.TUMOR_LOD_KEY, TLODs);
             }
             mergedGenotypes.add(genotypeBuilder.make());
         }
@@ -538,15 +551,18 @@ public final class ReferenceConfidenceVariantContextMerger {
 
         // create the index mapping, using the <NON-REF> allele whenever such a mapping doesn't exist
         for ( int i = 1; i < targetAlleles.size(); i++ ) {
-            // if there's more than 1 DEL allele then we need to use the best one
-            if ( targetAlleles.get(i) == Allele.SPAN_DEL && g.hasPL() ) {
-                final int occurrences = Collections.frequency(remappedAlleles, Allele.SPAN_DEL);
-                if ( occurrences > 1 ) {
-                    final int indexOfBestDel = indexOfBestDel(remappedAlleles, g.getPL(), g.getPloidy());
-                    indexMapping[i] = ( indexOfBestDel == -1 ? indexOfNonRef : indexOfBestDel );
-                    continue;
+
+                // if there's more than 1 DEL allele then we need to use the best one
+                if (targetAlleles.get(i) == Allele.SPAN_DEL) {
+                    if (!doSomaticMerge && g.hasPL()) {
+                        final int occurrences = Collections.frequency(remappedAlleles, Allele.SPAN_DEL);
+                        if (occurrences > 1) {
+                            final int indexOfBestDel = indexOfBestDel(remappedAlleles, g.getPL(), g.getPloidy());
+                            indexMapping[i] = (indexOfBestDel == -1 ? indexOfNonRef : indexOfBestDel);
+                            continue;
+                        }
+                    }
                 }
-            }
 
             final int indexOfRemappedAllele = remappedAlleles.indexOf(targetAlleles.get(i));
             indexMapping[i] = indexOfRemappedAllele == -1 ? indexOfNonRef : indexOfRemappedAllele;
@@ -630,6 +646,37 @@ public final class ReferenceConfidenceVariantContextMerger {
 
         return newAD;
     }
+
+    /**
+     * Generates a new TLOD array by adding zeros for missing alleles given the set of indexes of the Genotype's current
+     * alleles from the original TLOD array.
+     *
+     * @param g    the Genotype from which to parse the original TLOD(s)
+     * @param indexesOfRelevantAlleles the indexes of the original alleles corresponding to the new alleles
+     * @return non-null array of new TLOD values
+     */
+    @VisibleForTesting
+    static double[] generateTLODVector(final Genotype g, final int[] indexesOfRelevantAlleles) {
+        Utils.nonNull(g);
+        Utils.nonNull(indexesOfRelevantAlleles);
+
+        final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
+
+        final int numLODs = indexesOfRelevantAlleles.length - 1; //since these are log odds, this should just be alts
+        final double[] newLODs = new double[numLODs];
+
+        for ( int i = 1; i <= numLODs; i++ ) {
+            final int oldIndex = indexesOfRelevantAlleles[i];
+            if ( oldIndex >= originalTLODs.length ) {
+                newLODs[i-1] = 0;
+            } else {
+                newLODs[i-1] = originalTLODs[oldIndex];
+            }
+        }
+
+        return newLODs;
+    }
+
 
 
 }

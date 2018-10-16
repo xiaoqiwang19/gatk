@@ -88,7 +88,7 @@ public abstract class ReducibleAnnotationBaseTest extends GATKBaseTest {
     @Test(dataProvider = "interestingSitesCombineResults")
     public void testCombineAnnotationGATK3Concordance(List<VariantContext> VCs, VariantContext result, VariantContext genotyped) throws Exception {
         VariantAnnotatorEngine annotatorEngine = new VariantAnnotatorEngine(getAnnotationsToUse(), null, Collections.emptyList(), false);
-        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(annotatorEngine, new VCFHeader());
+        ReferenceConfidenceVariantContextMerger merger = new ReferenceConfidenceVariantContextMerger(annotatorEngine, new VCFHeader(), false);
         VariantContext merged = merger.merge(VCs, new SimpleInterval(result.getContig(), result.getStart(), result.getStart()), result.getReference().getBases()[0], false, false);
         Assert.assertTrue(VariantContextTestUtils.alleleSpecificAnnotationEquals(merged, result, getRawKey()));
     }
