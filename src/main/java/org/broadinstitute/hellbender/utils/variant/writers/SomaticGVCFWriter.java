@@ -4,25 +4,21 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
-import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.vcf.VCFConstants;
-import htsjdk.variant.vcf.VCFHeader;
-import htsjdk.variant.vcf.VCFStandardHeaderLines;
 import org.broadinstitute.hellbender.exceptions.GATKException;
-import org.broadinstitute.hellbender.utils.MathUtils;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.variant.GATKVCFConstants;
-import org.broadinstitute.hellbender.utils.variant.GATKVCFHeaderLines;
 
-import java.util.Collections;
 import java.util.List;
 
-import static htsjdk.variant.vcf.VCFConstants.MAX_GENOTYPE_QUAL;
-
-public class SomaticGVCFWriter extends GVCFWriter {
+/**
+ * Genome-wide VCF writer for somatic (Mutect2) output
+ * Merges reference blocks based on TLOD
+ */
+final public class SomaticGVCFWriter extends GVCFWriter {
 
     /**
      * Create a new GVCF writer

@@ -56,7 +56,7 @@ final class HomRefBlock extends GVCFBlock {
 
     // create a single Genotype with GQ and DP annotations
     @Override
-    Genotype createHomRefGenotype(String sampleName) {
+    Genotype createHomRefGenotype(final String sampleName) {
         final GenotypeBuilder gb = new GenotypeBuilder(sampleName, Collections.nCopies(getPloidy(), getRef()));
         gb.noAD().noPL().noAttributes(); // clear all attributes
 

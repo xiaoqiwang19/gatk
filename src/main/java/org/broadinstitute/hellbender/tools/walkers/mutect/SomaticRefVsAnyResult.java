@@ -6,9 +6,9 @@ import org.broadinstitute.hellbender.tools.walkers.haplotypecaller.ReferenceConf
  * Holds information about a genotype call of a single sample reference vs. any non-ref event
  *
  * IMPORTANT PERFORMANCE NOTE!!! Allowing direct field access (within this class only) speeds up
- * the HaplotypeCaller by ~10% vs. accessing the fields indirectly via setters, as seen in a profiler.
+ * the HaplotypeCaller (and thusly Mutect2) by ~10% vs. accessing the fields indirectly via setters, as seen in a profiler.
  */
-public final class SomaticRefVsAnyResult extends ReferenceConfidenceResult {
+final class SomaticRefVsAnyResult extends ReferenceConfidenceResult {
     /**
      * The genotype likelihoods for ref/ref ref/non-ref non-ref/non-ref
      *

@@ -23,21 +23,22 @@ import static htsjdk.variant.vcf.VCFConstants.MAX_GENOTYPE_QUAL;
 
 /**
  * Genome-wide VCF writer
+ * Merges blocks based on GQ
  */
 public class GVCFWriter implements VariantContextWriter {
 
     public final static String GVCF_BLOCK = "GVCFBlock";
 
     /** Where we'll ultimately write our VCF records */
-    protected final VariantContextWriter underlyingWriter;
+    private final VariantContextWriter underlyingWriter;
 
-    protected final RangeMap<Integer, Range<Integer>> gqPartitions;
+    final RangeMap<Integer, Range<Integer>> gqPartitions;
     private final int defaultPloidy;
 
     /** fields updated on the fly during GVCFWriter operation */
-    int nextAvailableStart = -1;
-    String contigOfNextAvailableStart = null;
-    String sampleName = null;
+    private int nextAvailableStart = -1;
+    private String contigOfNextAvailableStart = null;
+    private String sampleName = null;
     GVCFBlock currentBlock = null;
 
     /**
@@ -159,8 +160,9 @@ public class GVCFWriter implements VariantContextWriter {
         if (nextAvailableStart != -1) {
             //there's a use case here related to ReblockGVCFs for overlapping deletions on different haplotypes
             if ( vc.getStart() <= nextAvailableStart && vc.getContig().equals(contigOfNextAvailableStart) ) {
-                if (vc.getEnd() <= nextAvailableStart)
+                if (vc.getEnd() <= nextAvailableStart) {
                     return null;
+                }
             }
             // otherwise, reset to non-relevant
             nextAvailableStart = -1;
@@ -189,7 +191,7 @@ public class GVCFWriter implements VariantContextWriter {
     /**
      * Flush the current hom-ref block, if necessary, to the underlying writer, and reset the currentBlock to null
      */
-    protected void emitCurrentBlock() {
+    private void emitCurrentBlock() {
         if (currentBlock != null) {
             underlyingWriter.add(currentBlock.toVariantContext(sampleName));
             currentBlock = null;
