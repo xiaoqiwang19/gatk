@@ -58,14 +58,14 @@ public class SomaticGVCFWriter extends GVCFWriter {
     @VisibleForTesting
     public RangeMap<Integer,Range<Integer>> parsePartitions(final List<Integer> gqPartitions) {
         Utils.nonEmpty(gqPartitions);
-        Utils.containsNoNull(gqPartitions, "The list of GQ partitions contains a null integer");
+        Utils.containsNoNull(gqPartitions, "The list of TLOD partitions contains a null integer");
         final RangeMap<Integer, Range<Integer>> result = TreeRangeMap.create();
         int lastThreshold = 0;
         for (final Integer value : gqPartitions) {
             if (value < lastThreshold) {
-                throw new IllegalArgumentException(String.format("The list of GQ partitions is out of order. Previous value is %d but the next is %d.", lastThreshold, value));
+                throw new IllegalArgumentException(String.format("The list of TLOD partitions is out of order. Previous value is %d but the next is %d.", lastThreshold, value));
             } else if (value == lastThreshold) {
-                throw new IllegalArgumentException(String.format("The value %d appears more than once in the list of GQ partitions.", value));
+                throw new IllegalArgumentException(String.format("The value %d appears more than once in the list of TLOD partitions.", value));
             }
 
             result.put(Range.closedOpen(lastThreshold, value), Range.closedOpen(lastThreshold, value));
@@ -74,37 +74,6 @@ public class SomaticGVCFWriter extends GVCFWriter {
 
         result.put(Range.closedOpen(lastThreshold, Integer.MAX_VALUE), Range.closedOpen(lastThreshold, Integer.MAX_VALUE));
 
-        return result;
-    }
-
-    /**
-     * Add hom-ref site from vc to this gVCF hom-ref state tracking, emitting any pending states if appropriate
-     *
-     * @param vc a non-null VariantContext
-     * @param g  a non-null genotype from VariantContext
-     * @return a VariantContext to be emitted, or null if non is appropriate
-     */
-    @Override
-    protected VariantContext addHomRefSite(final VariantContext vc, final Genotype g) {
-
-        if (nextAvailableStart != -1) {
-            // don't create blocks while the hom-ref site falls before nextAvailableStart (for deletions)
-            if (vc.getStart() <= nextAvailableStart && vc.getContig().equals(contigOfNextAvailableStart)) {
-                return null;
-            }
-            // otherwise, reset to non-relevant
-            nextAvailableStart = -1;
-            contigOfNextAvailableStart = null;
-        }
-
-        final VariantContext result;
-        if (genotypeCanBeMergedInCurrentBlock(g)) {
-            currentBlock.add(vc.getStart(), g);
-            result = null;
-        } else {
-            result = currentBlock != null ? currentBlock.toVariantContext(sampleName): null;
-            currentBlock = createNewBlock(vc, g);
-        }
         return result;
     }
 
