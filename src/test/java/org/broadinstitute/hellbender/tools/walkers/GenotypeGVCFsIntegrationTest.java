@@ -57,12 +57,13 @@ public class GenotypeGVCFsIntegrationTest extends CommandLineProgramTest {
     private static final String ALLELE_SPECIFIC_DIRECTORY = toolsTestDir + "walkers/annotator/allelespecific";
 
     private static <T> void assertForEachElementInLists(final List<T> actual, final List<T> expected, final BiConsumer<T, T> assertion) {
-        Assert.assertEquals(actual.size(), expected.size(), "different number of elements in lists:\n"
-                + actual.stream().map(Object::toString).collect(Collectors.joining("\n","actual:\n","\n"))
-        +  expected.stream().map(Object::toString).collect(Collectors.joining("\n","expected:\n","\n")));
-        for (int i = 0; i < actual.size(); i++) {
-            assertion.accept(actual.get(i), expected.get(i));
-        }
+        throw new IllegalArgumentException("test");
+//        Assert.assertEquals(actual.size(), expected.size(), "different number of elements in lists:\n"
+//                + actual.stream().map(Object::toString).collect(Collectors.joining("\n","actual:\n","\n"))
+//        +  expected.stream().map(Object::toString).collect(Collectors.joining("\n","expected:\n","\n")));
+//        for (int i = 0; i < actual.size(); i++) {
+//            assertion.accept(actual.get(i), expected.get(i));
+//        }
     }
 
     @DataProvider(name = "gvcfsToGenotype")
