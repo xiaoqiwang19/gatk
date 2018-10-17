@@ -5,8 +5,10 @@ import htsjdk.samtools.util.Locatable;
 import htsjdk.variant.variantcontext.*;
 import htsjdk.variant.vcf.VCFConstants;
 import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.VCFHeaderLineCount;
 import htsjdk.variant.vcf.VCFInfoHeaderLine;
 import org.broadinstitute.hellbender.exceptions.UserException;
+import org.broadinstitute.hellbender.tools.walkers.annotator.AnnotationUtils;
 import org.broadinstitute.hellbender.tools.walkers.annotator.VariantAnnotatorEngine;
 import org.broadinstitute.hellbender.tools.walkers.annotator.allelespecific.AlleleSpecificAnnotationData;
 import org.broadinstitute.hellbender.tools.walkers.annotator.allelespecific.ReducibleAnnotationData;
@@ -133,7 +135,7 @@ public final class ReferenceConfidenceVariantContextMerger {
      * @param doSomaticMerge
      * @return non-null list of alleles
      */
-    private static List<Allele> replaceWithNoCallsAndDels(final VariantContext vc, boolean doSomaticMerge) {
+    private static List<Allele> replaceWithNoCallsAndDels(final VariantContext vc, final boolean doSomaticMerge) {
         Utils.nonNull(vc);
 
         final List<Allele> result = new ArrayList<>(vc.getNAlleles());
@@ -392,7 +394,17 @@ public final class ReferenceConfidenceVariantContextMerger {
                     annotationMap.put(key, values);
                 }
                 try {
-                    values.add(parseNumericInfoAttributeValue(vcfInputHeader, key, value.toString()));
+                    if (!value.toString().contains(",")) {
+                        values.add(parseNumericInfoAttributeValue(vcfInputHeader, key, value.toString()));
+                    }
+                    else {
+                        String[] valueArray = value.toString().split("\\[|,|\\]");
+                        for (final Object val : valueArray) {
+                            if (!val.equals("")) {
+                                values.add(parseNumericInfoAttributeValue(vcfInputHeader, key, val.toString()));
+                            }
+                        }
+                    }
                 } catch (final NumberFormatException e) {
                     oneShotAnnotationLogger.warn(String.format("Detected invalid annotations: When trying to merge variant contexts at location %s:%d the annotation %s was not a numerical value and was ignored",vcPair.getVc().getContig(),vcPair.getVc().getStart(),p.toString()));
                 }
@@ -473,8 +485,8 @@ public final class ReferenceConfidenceVariantContextMerger {
                 name = g.getSampleName();
             }
             final int ploidy = g.getPloidy();
-            final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy()));
-            genotypeBuilder.name(name);
+            final GenotypeBuilder genotypeBuilder = new GenotypeBuilder(g);
+            genotypeBuilder.alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy())).name(name);
             if (!doSomaticMerge) {
                 if (g.hasPL()) {
                     // lazy initialization of the genotype index map by ploidy.
@@ -490,9 +502,19 @@ public final class ReferenceConfidenceVariantContextMerger {
             else {
                 // lazy initialization of the genotype index map by ploidy.
                 perSampleIndexesOfRelevantAlleles = getIndexesOfRelevantAlleles(remappedAlleles, targetAlleles, vc.getStart(), g);
+                final int nonRefIndex = remappedAlleles.indexOf(Allele.NON_REF_ALLELE);
                 final int[] AD = g.hasAD() ? generateAD(g.getAD(), perSampleIndexesOfRelevantAlleles) : null;
-                final double[] TLODs = g.hasExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY) ? generateTLODVector(g, perSampleIndexesOfRelevantAlleles) : null;
-                genotypeBuilder.AD(AD).attribute(GATKVCFConstants.TUMOR_LOD_KEY, TLODs);
+                genotypeBuilder.AD(AD);
+                if (g.hasExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY)) {
+                    final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
+                    final double[] newTLODs = generateTLODVector(originalTLODs, perSampleIndexesOfRelevantAlleles, nonRefIndex);
+                    genotypeBuilder.attribute(GATKVCFConstants.TUMOR_LOD_KEY, AnnotationUtils.encodeValueList(Arrays.stream(newTLODs).boxed().collect(Collectors.toList()),"%.2f"));
+                }
+                else if (vc.hasAttribute(GATKVCFConstants.TUMOR_LOD_KEY)) {
+                    final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(vc, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
+                    final double[] newTLODs = generateTLODVector(originalTLODs, perSampleIndexesOfRelevantAlleles, nonRefIndex);
+                    genotypeBuilder.attribute(GATKVCFConstants.TUMOR_LOD_KEY, AnnotationUtils.encodeValueList(Arrays.stream(newTLODs).boxed().collect(Collectors.toList()),"%.2f"));
+                }
             }
             mergedGenotypes.add(genotypeBuilder.make());
         }
@@ -651,26 +673,24 @@ public final class ReferenceConfidenceVariantContextMerger {
      * Generates a new TLOD array by adding zeros for missing alleles given the set of indexes of the Genotype's current
      * alleles from the original TLOD array.
      *
-     * @param g    the Genotype from which to parse the original TLOD(s)
+     * @param originalTLODs    the array containing the pre-parsed, original TLOD(s)
      * @param indexesOfRelevantAlleles the indexes of the original alleles corresponding to the new alleles
      * @return non-null array of new TLOD values
      */
     @VisibleForTesting
-    static double[] generateTLODVector(final Genotype g, final int[] indexesOfRelevantAlleles) {
-        Utils.nonNull(g);
+    static double[] generateTLODVector(final double[] originalTLODs, final int[] indexesOfRelevantAlleles, final int nonRefInd) {
+        Utils.nonNull(originalTLODs);
         Utils.nonNull(indexesOfRelevantAlleles);
-
-        final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
 
         final int numLODs = indexesOfRelevantAlleles.length - 1; //since these are log odds, this should just be alts
         final double[] newLODs = new double[numLODs];
 
         for ( int i = 1; i <= numLODs; i++ ) {
             final int oldIndex = indexesOfRelevantAlleles[i];
-            if ( oldIndex >= originalTLODs.length ) {
-                newLODs[i-1] = 0;
+            if ( oldIndex > originalTLODs.length + 1 ) {  //TODO: this isn't right -- in really simple case at 152 it mixes up LODs
+                newLODs[i-1] = originalTLODs[nonRefInd-1];  //TODO: this should get non-ref LOD
             } else {
-                newLODs[i-1] = originalTLODs[oldIndex];
+                newLODs[i-1] = originalTLODs[oldIndex-1];
             }
         }
 

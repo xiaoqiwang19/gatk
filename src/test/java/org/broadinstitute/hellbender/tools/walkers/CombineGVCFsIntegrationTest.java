@@ -433,6 +433,9 @@ public class CombineGVCFsIntegrationTest extends CommandLineProgramTest {
         args.addOutput(output);
         args.addVCF(getTestFile("sample1.MT.g.vcf"));
         args.addVCF(getTestFile("sample2.MT.g.vcf"));
+        args.addBooleanArgument(CombineGVCFs.USE_SOMATIC_LONG_NAME, true);
         runCommandLine(args);
+
+        Assert.assertTrue(true);
     }
 }

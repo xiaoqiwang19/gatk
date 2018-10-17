@@ -417,18 +417,19 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
         final GenotypesContext genotypes = GenotypesContext.create();
         for (final VariantContext vc : vcs) {
             for (final Genotype g : vc.getGenotypes()) {
-                if (!somaticInput) {
-                    genotypes.add(new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy())).make());
+                GenotypeBuilder gb = new GenotypeBuilder(g).alleles(GATKVariantContextUtils.noCallAlleles(g.getPloidy()));
+                if (somaticInput) {
+
+                    if (vc.hasAttribute(GATKVCFConstants.TUMOR_LOD_KEY)) {
+                        gb.attribute(GATKVCFConstants.TUMOR_LOD_KEY, vc.getAttribute(GATKVCFConstants.TUMOR_LOD_KEY).toString());
+                    }
+                    if (vc.hasAttribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY)) {
+                        gb.attribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY, vc.getAttribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY).toString());
+                    }
                 }
-                else {
-                    genotypes.add(new GenotypeBuilder(g)
-                            .attribute(GATKVCFConstants.TUMOR_LOD_KEY, vc.getAttribute(GATKVCFConstants.TUMOR_LOD_KEY).toString())
-                            .attribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY, vc.getAttribute(GATKVCFConstants.EVENT_COUNT_IN_HAPLOTYPE_KEY).toString())
-                            .make());
-                }
+                genotypes.add(gb.make());
             }
         }
-
         return new VariantContextBuilder("", first.getContig(), start, end, Arrays.asList(refAllele, Allele.NON_REF_ALLELE)).attributes(attrs).genotypes(genotypes).make();
     }
 
