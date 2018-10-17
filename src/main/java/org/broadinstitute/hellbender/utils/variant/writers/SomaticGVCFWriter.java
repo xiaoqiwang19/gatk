@@ -89,12 +89,12 @@ final public class SomaticGVCFWriter extends GVCFWriter {
      */
     @Override
     GVCFBlock createNewBlock(final VariantContext vc, final Genotype g) {
-        // figure out the GQ limits to use based on the GQ of g
+        // figure out the GQ limits to use based on the LOD of g
         final double lod = Double.parseDouble(g.getExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY).toString());
-        final Range<Integer> partition = gqPartitions.get((int)Math.round(lod));
+        final Range<Integer> partition = gqPartitions.get((int)Math.floor(lod));
 
         if( partition == null) {
-            throw new GATKException("GQ " + g + " from " + vc + " didn't fit into any partition");
+            throw new GATKException("LOD for genotype " + g + " from " + vc + " didn't fit into any partition");
         }
 
         // create the block, add g to it, and return it for use

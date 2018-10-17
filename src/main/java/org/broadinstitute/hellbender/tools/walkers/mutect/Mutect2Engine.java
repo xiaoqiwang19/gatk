@@ -123,7 +123,7 @@ public final class Mutect2Engine implements AssemblyRegionEvaluator {
         genotypingEngine.setAnnotationEngine(annotationEngine);
         haplotypeBAMWriter = AssemblyBasedCallerUtils.createBamWriter(MTAC, createBamOutIndex, createBamOutMD5, header);
         trimmer.initialize(MTAC.assemblyRegionTrimmerArgs, header.getSequenceDictionary(), MTAC.debug,
-                MTAC.genotypingOutputMode == GenotypingOutputMode.GENOTYPE_GIVEN_ALLELES, false);
+                MTAC.genotypingOutputMode == GenotypingOutputMode.GENOTYPE_GIVEN_ALLELES, emitReferenceConfidence());
         referenceConfidenceModel = new SomaticReferenceConfidenceModel(samplesList, header, 0, genotypingEngine);  //TODO: do something classier with the indel size arg
         if (emitReferenceConfidence()) {
             MTAC.emissionLod = Double.NEGATIVE_INFINITY;

@@ -32,7 +32,7 @@ final class TLODBlock extends GVCFBlock {
      * @param upperLODBound the upperLODBound (exclusive) to use in this band
      */
     TLODBlock(final VariantContext startingVC, final int lowerLODBound, final int upperLODBound) {
-        super(startingVC, Math.round(lowerLODBound), Math.round(upperLODBound));
+        super(startingVC, (int)Math.floor(lowerLODBound), (int)Math.floor(upperLODBound));
         if ( lowerLODBound > upperLODBound ) { throw new IllegalArgumentException("bad lowerLODBound " + lowerLODBound + " as it's >= upperLODBound " + upperLODBound); }
         minLOD = lowerLODBound;
         maxLOD = upperLODBound;
@@ -64,7 +64,7 @@ final class TLODBlock extends GVCFBlock {
         // Make sure the LOD is within the bounds of this band
         final double currentLOD = Double.parseDouble(genotype.getExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY).toString());
         if ( !withinBounds(currentLOD)) {
-            throw new IllegalArgumentException("cannot add a genotype with LOD=" + genotype.getGQ() + " because it's not within bounds ["
+            throw new IllegalArgumentException("cannot add a genotype with LOD=" + currentLOD + " because it's not within bounds ["
                     + this.getLODLowerBound() + ',' + this.getLODUpperBound() + ')');
         }
 
