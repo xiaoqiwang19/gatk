@@ -43,18 +43,9 @@ import java.util.Map;
  *
  * @param <T> the type of Feature that this FeatureInput file contains (eg., VariantContext, BEDFeature, etc.)
  */
-public final class FeatureInput<T extends Feature> implements Serializable {
+public final class FeatureInput<T extends Feature> extends GatkInputURI implements Serializable {
 
     private static final long serialVersionUID = 1L;
-
-    /**
-     * Logical name for this source of Features optionally provided by the user on the command line
-     * using the --argument_name logical_name:feature_file syntax. Defaults to the absolute path of
-     * the underlying file if no logical name is specified
-     */
-    private final String name;
-
-    private final Map<String, String> keyValueMap;
 
     /**
      * File containing Features as specified by the user on the command line
@@ -72,115 +63,6 @@ public final class FeatureInput<T extends Feature> implements Serializable {
     public static final String FEATURE_ARGUMENT_TAG_DELIMITER = ":";
 
     /**
-     * Delimiter between key-value pairs in the --argument_name logical_name,key1=value1,key2=value2:feature_file syntax.
-     */
-    public static final String FEATURE_ARGUMENT_KEY_VALUE_PAIR_DELIMITER = ",";
-
-    /**
-     * Separator between keys and values in the --argument_name logical_name,key1=value1,key2=value2:feature_file syntax.
-     */
-    public static final String FEATURE_ARGUMENT_KEY_VALUE_SEPARATOR = "=";
-
-    /**
-     * Represents a parsed argument for the FeatureInput.
-     * Always has a file and a name.
-     * May have attributes.
-     */
-    private static final class ParsedArgument{
-        private final Map<String, String> keyValueMap;
-        private final String name;
-        private final String file;
-        private static final String URI_SCHEME_SEPARATOR = "//";
-        public static final String USAGE = "Argument must either be a file, or of the form logical_name:file or logical_name(,key=value)*:feature_file";
-
-        /**
-         * Parses an argument value String of the forms:
-         * "logical_name(,key=value)*:feature_file" or
-         * "logical_name:feature_file" or
-         * "feature_file"
-         * into logical name and file name and key=value pairs.
-         *
-         * The absolute path of the file is used as the logical name if none is present.
-         *
-         * @param rawArgumentValue argument value from the command line to parse
-         * @return The argument parsed from the provided string.
-         */
-        public static ParsedArgument of(final String rawArgumentValue) {
-            //Use negative look ahead to avoid splitting URIs into multiple tokens
-            //i.e. someName:file://somefile -> ["someName", "file://somefile"]
-            final String MATCH_NAME_BUT_NOT_URI_OR_PORT = FEATURE_ARGUMENT_TAG_DELIMITER + "(?!" + URI_SCHEME_SEPARATOR + "|\\d+)";
-            final String[] tokens = rawArgumentValue.split(MATCH_NAME_BUT_NOT_URI_OR_PORT, -1);
-
-            if ( Arrays.stream(tokens).anyMatch(String::isEmpty)) {
-                throw new CommandLineException.BadArgumentValue("", rawArgumentValue, "Empty name/file encountered. " + USAGE);
-            }
-
-            if (tokens.length == 0 || tokens.length > 2) {
-                throw new CommandLineException.BadArgumentValue("", rawArgumentValue, USAGE);
-            } else if (tokens.length == 1) {
-                // No user-specified logical name for this FeatureInput, so use the absolute path to the File as its name
-                final String featurePath = tokens[0];
-                return new ParsedArgument(getDefaultName(featurePath), featurePath);
-            } else {
-                // User specified a logical name (and optional list of key-value pairs)
-                // for this FeatureInput using name(,key=value)*:File syntax.
-                // eg foo:file.vcf
-                // eg foo,a=3,b=false,c=fred:file.vcf
-                final String[] subtokens= tokens[0].split(FEATURE_ARGUMENT_KEY_VALUE_PAIR_DELIMITER, -1);
-                if (subtokens[0].isEmpty()){
-                    throw new CommandLineException.BadArgumentValue("", rawArgumentValue, USAGE);
-                }
-                final ParsedArgument pa= new ParsedArgument(subtokens[0], tokens[1]);
-                //note: starting from 1 because 0 is the name
-                for (int i = 1; i < subtokens.length; i++){
-                    final String[] kv = subtokens[i].split(FEATURE_ARGUMENT_KEY_VALUE_SEPARATOR, -1);
-                    if (kv.length != 2 || kv[0].isEmpty() || kv[1].isEmpty()){
-                        throw new CommandLineException.BadArgumentValue("", rawArgumentValue, USAGE);
-                    }
-                    if (pa.containsKey(kv[0])){
-                        throw new CommandLineException.BadArgumentValue("", rawArgumentValue, "Duplicate key " + kv[0] + "\n" + USAGE);
-                    }
-                    pa.addKeyValue(kv[0], kv[1]);
-                }
-                return pa;
-            }
-        }
-
-        private static String getDefaultName(String featurePath) {
-            return FeatureInput.makeIntoAbsolutePath(featurePath);
-        }
-
-        private ParsedArgument(final String name, final String file) {
-            this.name=name;
-            this.file=file;
-            this.keyValueMap = new LinkedHashMap<>(2);
-        }
-
-        public String getFilePath(){
-            return file;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        /**
-         * Returns an immutable view of the key-value map.
-         */
-        public Map<String, String> keyValueMap() {
-            return Collections.unmodifiableMap(keyValueMap);
-        }
-
-        public void addKeyValue(final String k, final String v) {
-            keyValueMap.put(k, v);
-        }
-
-        private boolean containsKey(final String k) {
-            return keyValueMap.containsKey(k);
-        }
-    }
-
-    /**
      * Construct a FeatureInput from a String argument value either of the form "logical_name:feature_file"
      * or simply "feature_file".
      *
@@ -192,12 +74,9 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      * @param rawArgumentValue String of the form "logical_name:feature_file" or "feature_file"
      */
     FeatureInput(final String rawArgumentValue) {
+        super(rawArgumentValue);
         Utils.nonNull(rawArgumentValue, "rawArgumentValue");
-        final ParsedArgument parsedArgument = ParsedArgument.of(rawArgumentValue);
-
-        name = parsedArgument.getName();
-        keyValueMap = parsedArgument.keyValueMap();
-        this.featureFile = parsedArgument.getFilePath();
+        this.featureFile = this.getFeaturePath().toString();
     }
 
     /**
@@ -218,11 +97,14 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      */
     @VisibleForTesting
     public FeatureInput(final String featureFile, final String name, final Map<String, String> keyValueMap) {
+        super(featureFile);
+
         Utils.nonNull(name, "name");
         Utils.nonNull(keyValueMap, "kevValueMap");
         Utils.nonNull(featureFile, "feature-file");
-        this.name = name;
-        this.keyValueMap = Collections.unmodifiableMap(new LinkedHashMap<>(keyValueMap));   //make a unmodifiable copy
+
+        setTag(name);
+        setTagAttributes(keyValueMap);
         this.featureFile = featureFile;
     }
 
@@ -244,6 +126,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
     /**
      * creates a name from the given filePath by finding the absolute path of the given input
      */
+    //TODO: this is redundant with BucketUtils.makeFilePathAbsolute(String)
     private static String makeIntoAbsolutePath(final String filePath){
         if(GenomicsDBUtils.isGenomicsDBPath(filePath)){
             return GenomicsDBUtils.GENOMIC_DB_URI_SCHEME + new File(filePath.replace(GenomicsDBUtils.GENOMIC_DB_URI_SCHEME,"")).getAbsolutePath();
@@ -261,7 +144,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      */
     public String getAttribute(final String key) {
         Utils.nonNull(key);
-        return keyValueMap.get(key);
+        return getAttribute(key);
     }
 
     /**
@@ -272,7 +155,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      * @return logical name of this source of Features
      */
     public String getName() {
-        return name;
+        return getTag();
     }
 
     /**
@@ -280,7 +163,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      * @return true if the value for name does not match the default, indicating it was a user supplied name (i.e. foo:file.vcf)
      */
     public boolean hasUserSuppliedName() {
-        return !ParsedArgument.getDefaultName(getFeaturePath()).equals(name);
+        return !featureFile.equals(getTag());
     }
 
     /**
@@ -299,7 +182,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
      */
     @Override
     public int hashCode() {
-        return 31 * name.hashCode() + featureFile.hashCode();
+        return 31 * getTag().hashCode() + featureFile.hashCode();
     }
 
     /**
@@ -315,7 +198,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
         }
 
         final FeatureInput<?> otherFeature = (FeatureInput<?>)other;
-        return name.equals(otherFeature.name) && featureFile.equals(otherFeature.featureFile);
+        return getTag().equals(otherFeature.getTag()) && featureFile.equals(otherFeature.featureFile);
     }
 
     /**
@@ -328,7 +211,7 @@ public final class FeatureInput<T extends Feature> implements Serializable {
     @Override
     public String toString() {
         final String featureFilePath = makeIntoAbsolutePath(featureFile);
-        return name.equals(featureFilePath) ? featureFilePath :
-                                              String.format("%s%s%s", name, FEATURE_ARGUMENT_TAG_DELIMITER, featureFilePath);
+        return getTag().equals(featureFilePath) ? featureFilePath :
+                                              String.format("%s%s%s", getTag(), FEATURE_ARGUMENT_TAG_DELIMITER, featureFilePath);
     }
 }

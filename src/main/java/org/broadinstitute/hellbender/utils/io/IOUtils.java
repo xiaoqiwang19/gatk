@@ -756,6 +756,8 @@ public final class IOUtils {
             if (CloudStorageFileSystem.URI_SCHEME.equals(uri.getScheme())) {
                 return BucketUtils.getPathOnGcs(uriString);
             }
+            // Paths.get(String) assumes the default file system
+            // Paths.get(URI) uses the scheme
             return uri.getScheme() == null ? Paths.get(uriString) : Paths.get(uri);
         } catch (FileSystemNotFoundException e) {
             try {
@@ -766,6 +768,9 @@ public final class IOUtils {
                 return FileSystems.newFileSystem(uri, new HashMap<>(), cl).provider().getPath(uri);
             }
             catch (ProviderNotFoundException x) {
+                // TODO: this creates bogus Path on the current file system for schemes such as gendb, nonexistent, gcs
+                // TODO: we depend on this code path to allow IntervalUtils to all getPath on a string that may be either
+                // a literal interval or a feature file containing intervals
                 // not a valid URI. Caller probably just gave us a file name or "chr1:1-2".
                 return Paths.get(uriString);
             }
