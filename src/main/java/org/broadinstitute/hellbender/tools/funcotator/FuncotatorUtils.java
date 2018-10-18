@@ -92,25 +92,59 @@ public final class FuncotatorUtils {
     }
 
     /**
-     * Returns the {@link AminoAcid} corresponding to the given three-letter Mitochondrial {@code codon}.
+     * Returns the {@link AminoAcid} corresponding to the given three-letter Mitochondrial {@code rawCodon}.
      * The codons given are expected to be valid for Mitochondrial DNA.
-     * @param codon The three-letter codon (each letter one of A,T,G,C) representing a Mitochondrial {@link AminoAcid}
-     * @return The {@link AminoAcid} corresponding to the given {@code codon}.  Returns {@code null} if the given {@code codon} does not code for a Mitochondrial {@link AminoAcid}.
+     * @param rawCodon The three-letter codon (each letter one of A,[T or U],G,C) representing a Mitochondrial {@link AminoAcid}
+     * @param isGenusBosAndFirst {@code True} iff the codon to be decoded is from a sample in the genus Bos (cow) and came first in the coding sequence.
+     * @param isGenusHomoAndFirst {@code True} iff  the codon to be decoded is from a sample in the genus Homo (human) and came first in the coding sequence.
+     * @param isGenusMusAndFirst {@code True} iff  the codon to be decoded is from a sample in the genus Mus (mouse) and came first in the coding sequence.
+     * @param isGenusCorturnixAndFirst {@code True} iff  the codon to be decoded is from a sample in the genus Corturnix (quail) and came first in the coding sequence.
+     * @param isGenusGallusAndFirst {@code True} iff  the codon to be decoded is from a sample in the genus Gallus (chicken) and came first in the coding sequence.
+     * @return The {@link AminoAcid} corresponding to the given {@code rawCodon}.  Returns {@code null} if the given {@code rawCodon} does not code for a Mitochondrial {@link AminoAcid}.
      */
-    public static AminoAcid getMitochondrialAminoAcidByCodon(final String codon, final boolean isFirst) {
-
-        if (codon == null) {
+    public static AminoAcid getMitochondrialAminoAcidByCodon(final String rawCodon,
+                                                             final boolean isGenusBosAndFirst,
+                                                             final boolean isGenusHomoAndFirst,
+                                                             final boolean isGenusMusAndFirst,
+                                                             final boolean isGenusCorturnixAndFirst,
+                                                             final boolean isGenusGallusAndFirst) {
+        if (rawCodon == null) {
             return null;
         }
 
-        final String upperCodon = codon.toUpperCase();
-        if ( isFirst && upperCodon.equals("ATT") || upperCodon.equals("ATA") ) {
+        // TODO: Need to solicit more info on partly coded stop codons as alluded to here: https://www.sciencedirect.com/science/article/pii/S0005272898001613
+
+        // Convert Uracils to Thymines and convert to upper case so we can use our normal lookup table:
+        // Note: this may be unnecessary, but is here for safety and correctness (at least according to the
+        //       lookup table on wikipedia https://en.wikipedia.org/wiki/Vertebrate_mitochondrial_code).
+        final String upperCodon = rawCodon.replaceAll("[Uu]", "T").toUpperCase();
+
+        // All special cases taken from the above wikipedia page.
+        // Check our starting codon special cases first:
+        if ( isGenusBosAndFirst && upperCodon.equals("ATA") ) {
             return AminoAcid.METHIONINE;
-        } else if ( upperCodon.equals("AGA") || upperCodon.equals("AGG") ) {
+        }
+        else if ( isGenusHomoAndFirst && upperCodon.equals("ATT") ) {
+            return AminoAcid.METHIONINE;
+        }
+        else if ( isGenusMusAndFirst && (upperCodon.equals("ATT") || upperCodon.equals("ATC")) ) {
+            return AminoAcid.METHIONINE;
+        }
+        else if ( (isGenusCorturnixAndFirst || isGenusGallusAndFirst) && upperCodon.equals("GTG") ) {
+            return AminoAcid.METHIONINE;
+        }
+
+        // Now check the codons for the rest of the special cases:
+        else if ( upperCodon.equals("ATA") ) {
+            return AminoAcid.METHIONINE;
+        }
+        else if ( upperCodon.equals("AGA") || upperCodon.equals("AGG") ) {
             return AminoAcid.STOP_CODON;
-        } else if ( upperCodon.equals("TGA") ) {
+        }
+        else if ( upperCodon.equals("TGA") ) {
             return AminoAcid.TRYPTOPHAN;
-        } else {
+        }
+        else {
             return tableByCodon.get(upperCodon);
         }
     }
@@ -1060,6 +1094,41 @@ public final class FuncotatorUtils {
      * @return A {@link String} containing a sequence of single-letter amino acids.
      */
     public static String createAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
+
+        Utils.nonNull(codingSequence);
+
+        final StringBuilder sb = new StringBuilder();
+
+        // Ensure that we don't have remainder bases:
+        int maxIndex = codingSequence.length();
+        if ( maxIndex % 3 != 0 ) {
+            maxIndex = (int)Math.floor(maxIndex / 3) * 3;
+            if ( !isFrameshift ) {
+                logger.warn("createAminoAcidSequence given a coding sequence of length not divisible by 3.  Dropping bases from the end: " + (codingSequence.length() % 3) + (extraLoggingInfo.isEmpty() ? "" : " " + extraLoggingInfo));
+            }
+        }
+
+        for ( int i = 0; i < maxIndex; i += 3 ) {
+            final AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
+            if ( aa == null ) {
+                throw new UserException.MalformedFile("File contains a bad codon sequence that has no amino acid equivalent: " + codingSequence.substring(i, i+3));
+            }
+            else {
+                sb.append(aa.getLetter());
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Creates a Mitochondrial amino acid sequence from a given coding sequence.
+     * If the coding sequence is not evenly divisible by 3, the remainder bases will not be included in the coding sequence.
+     * @param codingSequence The coding sequence from which to create an amino acid sequence.  Must not be {@code null}.
+     * @param isFrameshift Whether the given {@code codingSequence} was derived from a frameshift mutation.  In this case, no warning will be issued for incorrect sequence length.
+     * @param extraLoggingInfo A {@link String} containing extra info for logging purposes.
+     * @return A {@link String} containing a sequence of single-letter amino acids.
+     */
+    public static String createMitochondrialAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
 
         Utils.nonNull(codingSequence);
 
@@ -2071,7 +2140,7 @@ public final class FuncotatorUtils {
      * @param alignedCodingSequenceAlleleStart The codon-aligned position (1-based, inclusive) in the _coding sequence_ at which the variant begins.  (NOTE: This is _not_ the same the genomic position, nor is it necessarily the same as the transcript position of the variant).
      * @param codingSequence The strand-corrected (i.e. if on the - strand, it has been reverse-complemented) sequence of bases containing the _coding sequence_ for a particular transcript of a gene, from which we should render a protein change.  (NOTE: This is _not_ the same the gene sequence, nor is it necessarily the same as the whole transcript sequence).  Must not be {@code null}.
      * @param strand The {@link Strand} on which the transcript for this protein change occurs.  Must not be {@link Strand#NONE}.  Must not be {@code null}.
-     * @return
+     * @return A {@link ProteinChangeInfo} object describing how the protein coding sequence changes for the given {@code refAllele} and {@code altAllele}.
      */
     public static ProteinChangeInfo createProteinChangeInfo(final Allele refAllele,
                                                             final Allele altAllele,
