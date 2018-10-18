@@ -44,6 +44,7 @@ public class GenotypeGVCFsIntegrationTest extends CommandLineProgramTest {
      private static final String BASE_PAIR_EXPECTED = "gvcf.basepairResolution.gatk3.7_30_ga4f720357.output.vcf";
     private static final String b38_reference_20_21 = largeFileTestDir + "Homo_sapiens_assembly38.20.21.fasta";
     private static final String BASE_PAIR_GVCF = "gvcf.basepairResolution.gvcf";
+    private static final File MITO_REF = new File(toolsTestDir, "mutect/mito/Homo_sapiens_assembly38.mt_only.fasta");
 
     private static final File CEUTRIO_20_21_GATK3_4_G_VCF = new File(largeFileTestDir, "gvcfs/CEUTrio.20.21.gatk3.4.g.vcf");
     private static final String CEUTRIO_20_21_EXPECTED_VCF = "CEUTrio.20.21.gatk3.7_30_ga4f720357.expected.vcf";
@@ -298,5 +299,18 @@ public class GenotypeGVCFsIntegrationTest extends CommandLineProgramTest {
         Assert.assertThrows(CommandLineException.MissingArgument.class, () -> runCommandLine(args));
         args.addArgument("L", "20:69512-69513");
         runCommandLine(args);
+    }
+
+    @Test
+    public void testGenotypingForSomaticGVCFs() {
+        final File output = createTempFile("tmp", ".vcf");
+        ArgumentsBuilder args =   new ArgumentsBuilder()
+                .addVCF(getTestFile("combined.MT.g.vcf"))
+                .addReference(MITO_REF)
+                .addOutput(output)
+                .addBooleanArgument(CombineGVCFs.USE_SOMATIC_LONG_NAME, true);
+        runCommandLine(args);
+
+        Assert.assertTrue(true);
     }
 }

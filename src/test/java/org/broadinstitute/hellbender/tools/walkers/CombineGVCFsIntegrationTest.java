@@ -437,5 +437,8 @@ public class CombineGVCFsIntegrationTest extends CommandLineProgramTest {
         runCommandLine(args);
 
         Assert.assertTrue(true);
+        //e.g. position 302 should have 6 alt alleles, each GT should have 7 AD values, 6 AF values
     }
+
+    //TODO: need a test for combining with a multi-sample input
 }

@@ -81,7 +81,8 @@ public final class CombineGVCFs extends MultiVariantWalkerGroupedOnStart {
 
     public static final String BP_RES_LONG_NAME = "convert-to-base-pair-resolution";
     public static final String BREAK_BANDS_LONG_NAME = "break-bands-at-multiples-of";
-    public static final String USE_SOMATIC_LONG_NAME = "use-somatic-merging";
+    public static final String USE_SOMATIC_LONG_NAME = "input-is-somatic";
+    public static final String ALLELE_FRACTION_DELTA_LONG_NAME = "allele-fraction-error";
 
     @Argument(fullName= StandardArgumentDefinitions.OUTPUT_LONG_NAME,
             shortName=StandardArgumentDefinitions.OUTPUT_SHORT_NAME,

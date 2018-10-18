@@ -38,6 +38,7 @@ public final class ReferenceConfidenceVariantContextMerger {
     private final boolean doSomaticMerge;
     protected final OneShotLogger oneShotAnnotationLogger = new OneShotLogger(this.getClass());
     protected final OneShotLogger oneShotHeaderLineLogger = new OneShotLogger(this.getClass());
+    private static final List<String> INFO_ANNOTATIONS_TO_DROP = Arrays.asList(GATKVCFConstants.TUMOR_LOD_KEY);
 
     public ReferenceConfidenceVariantContextMerger(VariantAnnotatorEngine engine, final VCFHeader inputHeader, boolean somaticInput) {
         Utils.nonNull(inputHeader, "A VCF header must be provided");
@@ -367,6 +368,9 @@ public final class ReferenceConfidenceVariantContextMerger {
     private void addReferenceConfidenceAttributes(final VCWithNewAlleles vcPair, final Map<String, List<?>> annotationMap) {
         for ( final Map.Entry<String, Object> p : vcPair.getVc().getAttributes().entrySet() ) {
             final String key = p.getKey();
+            if (INFO_ANNOTATIONS_TO_DROP.contains(key)) {
+                continue;
+            }
 
             // If the key corresponds to a requested reducible key, store the data as AlleleSpecificAnnotationData
             if (annotatorEngine.isRequestedReducibleRawKey(key)) {
@@ -500,13 +504,36 @@ public final class ReferenceConfidenceVariantContextMerger {
                 }
             }
             else {
+                genotypeBuilder.noAttributes();
+                if (g.hasDP()) {
+                    genotypeBuilder.DP(g.getDP());
+                }
+                //TODO: which other Mutect annotations do we want to keep?
+
                 // lazy initialization of the genotype index map by ploidy.
                 perSampleIndexesOfRelevantAlleles = getIndexesOfRelevantAlleles(remappedAlleles, targetAlleles, vc.getStart(), g);
                 final int nonRefIndex = remappedAlleles.indexOf(Allele.NON_REF_ALLELE);
-                final int[] AD = g.hasAD() ? generateAD(g.getAD(), perSampleIndexesOfRelevantAlleles) : null;
-                genotypeBuilder.AD(AD);
-                if (g.hasExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY)) {
-                    final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
+                final int[] AD;
+                if (g.hasAD()) {
+                    AD = generateAD(g.getAD(), perSampleIndexesOfRelevantAlleles);
+                    genotypeBuilder.AD(AD);
+                } else if (g.hasDP()) {
+                    AD = new int[targetAlleles.size()];
+                    AD[0] = g.getDP();
+                    genotypeBuilder.AD(AD);
+                }
+                if (g.hasExtendedAttribute(GATKVCFConstants.ALLELE_FRACTION_KEY)) {  //homRef calls don't have AF
+                    final double[] AF = generateAF(GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.ALLELE_FRACTION_KEY, () -> new double[]{0.0}, 0.0), perSampleIndexesOfRelevantAlleles, nonRefIndex);
+                    genotypeBuilder.attribute(GATKVCFConstants.ALLELE_FRACTION_KEY, AF);
+                }
+                else if (g.isHomRef() && vc.getAlternateAlleles().size() == 1) {  //homRef blocks don't get an AF so assign it here
+                    genotypeBuilder.attribute(GATKVCFConstants.ALLELE_FRACTION_KEY, new int[targetAlleles.size()-1]);
+                }
+                if (g.hasExtendedAttribute(GATKVCFConstants.TUMOR_LOD_KEY)) {  //if this is a multi-sample input, there may already be a FORMAT TLOD
+                    double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(g, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
+                    if (g.isHomRef() && originalTLODs.length == 1) {
+                        originalTLODs[0] = -originalTLODs[0];
+                    }
                     final double[] newTLODs = generateTLODVector(originalTLODs, perSampleIndexesOfRelevantAlleles, nonRefIndex);
                     genotypeBuilder.attribute(GATKVCFConstants.TUMOR_LOD_KEY, AnnotationUtils.encodeValueList(Arrays.stream(newTLODs).boxed().collect(Collectors.toList()),"%.2f"));
                 }
@@ -514,6 +541,11 @@ public final class ReferenceConfidenceVariantContextMerger {
                     final double[] originalTLODs = GATKProtectedVariantContextUtils.getAttributeAsDoubleArray(vc, GATKVCFConstants.TUMOR_LOD_KEY, () -> new double[] {0.0}, 0.0);
                     final double[] newTLODs = generateTLODVector(originalTLODs, perSampleIndexesOfRelevantAlleles, nonRefIndex);
                     genotypeBuilder.attribute(GATKVCFConstants.TUMOR_LOD_KEY, AnnotationUtils.encodeValueList(Arrays.stream(newTLODs).boxed().collect(Collectors.toList()),"%.2f"));
+                }
+                if (vc.isFiltered()) {
+                    final List<String> infoFilters = new ArrayList<>();
+                    infoFilters.addAll(vc.getFilters());
+                    genotypeBuilder.filters(infoFilters);
                 }
             }
             mergedGenotypes.add(genotypeBuilder.make());
@@ -651,11 +683,38 @@ public final class ReferenceConfidenceVariantContextMerger {
      */
     @VisibleForTesting
     static int[] generateAD(final int[] originalAD, final int[] indexesOfRelevantAlleles) {
+        return remapRLengthIntArray(originalAD, indexesOfRelevantAlleles);
+    }
+
+    static double[] generateAF(final double[] originalAF, final int[] indexesOfRelevantAlleles, final int nonRefIndex) {
+        return remapALengthDoubleArray(originalAF, indexesOfRelevantAlleles, nonRefIndex);
+    }
+
+    static int[] remapRLengthIntArray(final int[] originalAD, final int[] indexesOfRelevantAlleles) {
         Utils.nonNull(originalAD);
         Utils.nonNull(indexesOfRelevantAlleles);
 
         final int numADs = indexesOfRelevantAlleles.length;
         final int[] newAD = new int[numADs];
+
+        for ( int i = 0; i < numADs; i++ ) {
+            final int oldIndex = indexesOfRelevantAlleles[i];
+            if ( oldIndex >= originalAD.length ) {
+                newAD[i] = 0;
+            } else {
+                newAD[i] = originalAD[oldIndex];
+            }
+        }
+
+        return newAD;
+    }
+
+    static double[] remapRLengthDoubleArray(final double[] originalAD, final int[] indexesOfRelevantAlleles) {
+        Utils.nonNull(originalAD);
+        Utils.nonNull(indexesOfRelevantAlleles);
+
+        final int numADs = indexesOfRelevantAlleles.length;
+        final double[] newAD = new double[numADs];
 
         for ( int i = 0; i < numADs; i++ ) {
             final int oldIndex = indexesOfRelevantAlleles[i];
@@ -679,6 +738,11 @@ public final class ReferenceConfidenceVariantContextMerger {
      */
     @VisibleForTesting
     static double[] generateTLODVector(final double[] originalTLODs, final int[] indexesOfRelevantAlleles, final int nonRefInd) {
+        final double[] newLODs = remapALengthDoubleArray(originalTLODs, indexesOfRelevantAlleles, nonRefInd);
+        return newLODs;
+    }
+
+    private static double[] remapALengthDoubleArray(double[] originalTLODs, int[] indexesOfRelevantAlleles, int nonRefInd) {
         Utils.nonNull(originalTLODs);
         Utils.nonNull(indexesOfRelevantAlleles);
 
@@ -687,16 +751,14 @@ public final class ReferenceConfidenceVariantContextMerger {
 
         for ( int i = 1; i <= numLODs; i++ ) {
             final int oldIndex = indexesOfRelevantAlleles[i];
-            if ( oldIndex > originalTLODs.length + 1 ) {  //TODO: this isn't right -- in really simple case at 152 it mixes up LODs
-                newLODs[i-1] = originalTLODs[nonRefInd-1];  //TODO: this should get non-ref LOD
+            if ( oldIndex > originalTLODs.length + 1 ) {
+                newLODs[i-1] = originalTLODs[nonRefInd-1];  //lot of gross indices because there's the alleles list includes ref but the TLODs don't
             } else {
                 newLODs[i-1] = originalTLODs[oldIndex-1];
             }
         }
-
         return newLODs;
     }
-
 
 
 }
