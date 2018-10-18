@@ -14,6 +14,7 @@ import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.StructuralVariantType;
 import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.vcf.VCFConstants;
 import org.broadinstitute.hellbender.GATKBaseTest;
 import org.broadinstitute.hellbender.engine.*;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -1615,11 +1616,11 @@ public class GencodeFuncotationFactoryUnitTest extends GATKBaseTest {
     @DataProvider
     public Object[][] provideSimpleGenesField() {
         return new Object[][] {
-                // TODO: get rid of magic constant <DEL>, END.
+
                 // Two genes found
                 {new VariantContextBuilder()
                         .chr("chr3").start(2613200).stop(3200000)
-                        .attribute("END", 3200000)
+                        .attribute(VCFConstants.END_KEY, 3200000)
                         .alleles(Arrays.asList(
                                 Allele.create("T", true),
                                 Allele.create(SimpleSVType.createBracketedSymbAlleleString(StructuralVariantType.DEL.name()), false))
@@ -1630,11 +1631,21 @@ public class GencodeFuncotationFactoryUnitTest extends GATKBaseTest {
                 //TODO: Is sorting alphabetical or by genomic region?  May have to check oncotator.
                 {new VariantContextBuilder()
                         .chr("chr3").start(2100000).stop(3200000)
-                        .attribute("END", 3200000)
+                        .attribute(VCFConstants.END_KEY, 3200000)
                         .alleles(Arrays.asList(
                                 Allele.create("T", true),
                                 Allele.create(SimpleSVType.createBracketedSymbAlleleString(StructuralVariantType.DEL.name()), false))
                         )
+                        .make(), "CNTN4,CNTN4-AS1,CNTN4-AS2"},
+
+                // We use no call for copy neutral
+                {new VariantContextBuilder()
+                        .chr("chr3").start(2100000).stop(3200000)
+                        .attribute(VCFConstants.END_KEY, 3200000)
+                        .alleles(Arrays.asList(
+                                Allele.create("T", true),
+                                AnnotatedIntervalToSegmentVariantContextConverter.COPY_NEUTRAL_ALLELE
+                        ))
                         .make(), "CNTN4,CNTN4-AS1,CNTN4-AS2"}
         };
     }

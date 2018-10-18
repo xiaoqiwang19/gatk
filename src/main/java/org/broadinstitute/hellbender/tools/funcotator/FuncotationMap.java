@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import htsjdk.variant.variantcontext.Allele;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.hellbender.exceptions.GATKException;
@@ -228,5 +229,62 @@ public class FuncotationMap {
 
     private static boolean areDuplicateTranscriptIDsFound(final List<GencodeFuncotation> gencodeFuncotations) {
         return gencodeFuncotations.size() != new HashSet<>(gencodeFuncotations).size();
+    }
+
+    // TODO: Docs
+    // TODO: Tests
+    public Set<String> getFieldNames(final String transcriptId) {
+        Utils.nonNull(transcriptId);
+
+        final LinkedHashSet<Funcotation> funcotations =  txToFuncotations.getOrDefault(transcriptId, new LinkedHashSet<>());
+        return funcotations.stream().map(f -> f.getFieldNames()).flatMap(s -> s.stream()).collect(Collectors.toSet());
+    }
+
+    // TODO: Docs
+    // TODO: Tests
+    public Set<String> getFieldNames() {
+        final List<String> txIds = getTranscriptList();
+        final Set<String> result = new HashSet<>();
+        txIds.forEach(txId -> result.addAll(getFieldNames(txId)));
+        return result;
+    }
+
+    // TODO: Docs
+    // TODO: Tests
+    public Set<String> getFieldNames(final String transcriptId, final Allele allele) {
+        Utils.nonNull(transcriptId);
+        Utils.nonNull(allele);
+
+        final LinkedHashSet<Funcotation> funcotations =  txToFuncotations.getOrDefault(transcriptId, new LinkedHashSet<>());
+        return funcotations.stream()
+                .filter(f -> f.getAltAllele().equals(allele))
+                .map(f -> f.getFieldNames())
+                .flatMap(s -> s.stream()).collect(Collectors.toSet());
+    }
+
+    //TODO: Docs
+    //TODO:Tests
+    public Set<Allele> getAlleles(final String transcriptId) {
+        final LinkedHashSet<Funcotation> funcotations =  txToFuncotations.getOrDefault(transcriptId, new LinkedHashSet<>());
+        return funcotations.stream().map(f -> f.getAltAllele()).collect(Collectors.toSet());
+    }
+
+    //TODO: Docs
+    //TODO:Tests
+    public boolean doAllTxAlleleCombinationsHaveTheSameFields() {
+
+        // First get every field seen in this funcotation map.
+        final Set<String> allFields = getFieldNames();
+
+        // Then get all txIds
+        final List<String> txIds = getTranscriptList();
+
+        final List<Pair<String,Allele>> txAlleleCombos = new ArrayList<>();
+        for (final String txId : txIds) {
+            getAlleles(txId).forEach(a -> txAlleleCombos.add(Pair.of(txId, a)));
+        }
+
+        // For each transcript-allele combo, get the fields
+        return txAlleleCombos.stream().allMatch(p -> getFieldNames(p.getLeft(), p.getRight()).equals(allFields));
     }
 }

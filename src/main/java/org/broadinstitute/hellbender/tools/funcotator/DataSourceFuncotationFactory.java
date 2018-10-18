@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.funcotator;
 
 import com.google.common.annotations.VisibleForTesting;
 import htsjdk.tribble.Feature;
+import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -11,10 +12,11 @@ import org.broadinstitute.hellbender.engine.FeatureInput;
 import org.broadinstitute.hellbender.engine.ReferenceContext;
 import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
-import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.SimpleSVType;
 
 import java.io.Closeable;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * An abstract class to allow for the creation of a {@link Funcotation} for a given data source.
@@ -202,7 +204,7 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
         // Create our funcotations:
         List<Funcotation> outputFuncotations;
 
-        if (GATKVariantContextUtils.isStructuralVariantContext(variant)) {
+        if (isSegmentVariantContext(variant)) {
             outputFuncotations = createFuncotationsOnSegment(variant, referenceContext, featureList);
         } else {
 
@@ -291,5 +293,20 @@ public abstract class DataSourceFuncotationFactory implements Closeable {
                                                          final ReferenceContext referenceContext,
                                                          final List<Feature> featureList) {
         throw new GATKException.ShouldNeverReachHereException("This funcotation factory does not support the annotation of segments.");
+    }
+
+    // TODO: Docs
+    // TODO: Tests
+    public static boolean isSegmentVariantContext(final VariantContext vc) {
+        for (final Allele a: vc.getAlternateAlleles()) {
+            final String representation = a.getDisplayString();
+            if (Stream.of(SimpleSVType.SupportedType.values()).anyMatch(s -> SimpleSVType.createBracketedSymbAlleleString(s.toString()).equals(representation))) {
+                return true;
+            }
+            if (a.equals(AnnotatedIntervalToSegmentVariantContextConverter.COPY_NEUTRAL_ALLELE)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

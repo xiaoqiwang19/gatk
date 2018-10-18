@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.tools.funcotator;
 
 import htsjdk.tribble.Feature;
+import htsjdk.variant.variantcontext.VariantContext;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.broadinstitute.barclay.argparser.Argument;
@@ -107,10 +108,14 @@ public class FuncotateSegments extends FeatureWalker<AnnotatedInterval> {
     public void apply(final AnnotatedInterval feature, final ReadsContext readsContext, final ReferenceContext referenceContext, final FeatureContext featureContext) {
 
         // Convert feature into a VariantContext
+        final VariantContext segmentVariantContext = AnnotatedIntervalToSegmentVariantContextConverter.convert(feature, referenceContext);
 
         // funcotate
+        //  The resulting funcotation map should only have one transcript ID.
+        final FuncotationMap funcotationMap = funcotatorEngine.createFuncotationMapForVariant(segmentVariantContext, referenceContext, featureContext);
 
         // write the variant context
+
     }
 
     @Override

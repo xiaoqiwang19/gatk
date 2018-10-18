@@ -19,7 +19,6 @@ import org.broadinstitute.hellbender.tools.funcotator.dataSources.DataSourceUtil
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
 import org.broadinstitute.hellbender.tools.funcotator.mafOutput.MafOutputRenderer;
 import org.broadinstitute.hellbender.tools.funcotator.metadata.FuncotationMetadata;
-import org.broadinstitute.hellbender.tools.funcotator.simpletsvoutput.SimpleTsvOutputRenderer;
 import org.broadinstitute.hellbender.tools.funcotator.vcfOutput.VcfOutputRenderer;
 import org.broadinstitute.hellbender.transformers.VariantTransformer;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -208,15 +207,16 @@ public final class FuncotatorEngine implements AutoCloseable {
                         defaultToolVcfHeaderLines, funcotatorArgs.excludedFields
                 );
                 break;
+                // TODO: Make sure this SEG block is correct.  Still needs composite output renderer probably.
             case SEG:
-                outputRenderer = new SimpleTsvOutputRenderer(funcotatorArgs.outputFile.toPath(),
-                        getFuncotationFactories(),
-                        headerForVariants,
-                        unaccountedForDefaultAnnotations,
-                        unaccountedForOverrideAnnotations,
-                        defaultToolVcfHeaderLines.stream().map(Object::toString).collect(Collectors.toCollection(LinkedHashSet::new)),
-                        funcotatorArgs.referenceVersion, funcotatorArgs.excludedFields);
-                break;
+//                outputRenderer = new SimpleTsvOutputRenderer(funcotatorArgs.outputFile.toPath(),
+//                        getFuncotationFactories(),
+//                        headerForVariants,
+//                        unaccountedForDefaultAnnotations,
+//                        unaccountedForOverrideAnnotations,
+//                        defaultToolVcfHeaderLines.stream().map(Object::toString).collect(Collectors.toCollection(LinkedHashSet::new)),
+//                        funcotatorArgs.referenceVersion, funcotatorArgs.excludedFields);
+//                break;
             default:
                 throw new GATKException("Unsupported output format type specified: " + funcotatorArgs.outputFormatType.toString());
         }
