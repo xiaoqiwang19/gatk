@@ -949,7 +949,7 @@ public class FuncotatorUtilsUnitTest extends GATKBaseTest {
         final ReferenceSequence   pik3caReferenceSequence    = pik3caTranscriptDataSource.queryAndPrefetch(pik3caFullTranscriptName, 158, 3364);
 
         // MUC16 is on chr19 and is transcribed in the REVERSE direction:
-        // (The magic numbers here are the coding region for this transscript for MUC16)
+        // (The magic numbers here are the coding region for this transcript for MUC16)
         final ReferenceDataSource muc16TranscriptDataSource = ReferenceDataSource.of(new File(FuncotatorTestConstants.GENCODE_DATA_SOURCE_FASTA_PATH_HG19).toPath());
         final String              muc16FullTranscriptName   = muc16TranscriptDataSource.getSequenceDictionary().getSequences().stream().filter(s -> s.getSequenceName().startsWith(FuncotatorTestConstants.MUC16_TRANSCRIPT)).map(SAMSequenceRecord::getSequenceName).collect(Collectors.joining());
         final ReferenceSequence   muc16ReferenceSequence    = muc16TranscriptDataSource.queryAndPrefetch(muc16FullTranscriptName, 205, 43728);
@@ -1136,6 +1136,19 @@ public class FuncotatorUtilsUnitTest extends GATKBaseTest {
                         Strand.NEGATIVE,
                         FuncotatorUtils.ProteinChangeInfo.create(3362,3362,"LS", "")
                 },
+        };
+    }
+
+    @DataProvider
+    Object[][] provideForCreateProteinChangeInfoForMitochondria() {
+
+        // Get the MT sequence for HG19 as a test:
+        final ReferenceDataSource mtTranscriptDataSource = ReferenceDataSource.of(new File(FuncotatorTestConstants.GENCODE_DATA_SOURCE_FASTA_PATH_HG19).toPath());
+        final String              mtFullTranscriptName   = mtTranscriptDataSource.getSequenceDictionary().getSequences().stream().filter(s -> s.getSequenceName().startsWith(FuncotatorTestConstants.MT_TRANSCRIPT)).map(SAMSequenceRecord::getSequenceName).collect(Collectors.joining());
+        final ReferenceSequence   mtReferenceSequence    = mtTranscriptDataSource.queryAndPrefetch(mtFullTranscriptName, 1, 1812);
+        
+        return new Object[][] {
+                {}
         };
     }
 
@@ -2027,6 +2040,11 @@ public class FuncotatorUtilsUnitTest extends GATKBaseTest {
                                               final boolean isGallus,
                                               final AminoAcid expected) {
         Assert.assertEquals(FuncotatorUtils.getMitochondrialAminoAcidByCodon(codon, isBos, isHomo, isMus, isCorturnix, isGallus), expected);
+
+        // Make sure to test the other case as well:
+        if ( !(isBos || isHomo || isMus || isCorturnix || isGallus ) ) {
+            Assert.assertEquals(FuncotatorUtils.getMitochondrialAminoAcidByCodon(codon), expected);
+        }
     }
 
     @Test(dataProvider = "provideDataForGetCodonChangeString")
@@ -2187,6 +2205,26 @@ public class FuncotatorUtilsUnitTest extends GATKBaseTest {
 
         Assert.assertEquals(
                 FuncotatorUtils.createProteinChangeInfo(
+                        refAllele,
+                        altAllele,
+                        codingSequenceAlleleStart,
+                        alignedCodingSequenceAlleleStart,
+                        codingSequence,
+                        strand),
+                expected
+        );
+    }
+
+    @Test(dataProvider = "provideForCreateProteinChangeInfoForMitochondria")
+    void testCreateProteinChangeInfoForMitochondria(final Allele refAllele,
+                                                    final Allele altAllele,
+                                                    final int codingSequenceAlleleStart,
+                                                    final int alignedCodingSequenceAlleleStart,
+                                                    final String codingSequence,
+                                                    final Strand strand,
+                                                    final FuncotatorUtils.ProteinChangeInfo expected ) {
+        Assert.assertEquals(
+                FuncotatorUtils.createProteinChangeInfoForMitochondria(
                         refAllele,
                         altAllele,
                         codingSequenceAlleleStart,

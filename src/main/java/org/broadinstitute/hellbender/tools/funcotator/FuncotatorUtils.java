@@ -29,6 +29,7 @@ import org.broadinstitute.hellbender.utils.variant.GATKVariantContextUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -89,6 +90,17 @@ public final class FuncotatorUtils {
             return null;
         }
         return tableByCodon.get(codon.toUpperCase());
+    }
+
+    /**
+     * Returns the {@link AminoAcid} corresponding to the given three-letter Mitochondrial {@code rawCodon}.
+     * The codons given are expected to be valid for Mitochondrial DNA.
+     * Assumes no special cases for alternate initiation sites.
+     * @param rawCodon The three-letter codon (each letter one of A,[T or U],G,C) representing a Mitochondrial {@link AminoAcid}
+     * @return The {@link AminoAcid} corresponding to the given {@code rawCodon}.  Returns {@code null} if the given {@code rawCodon} does not code for a Mitochondrial {@link AminoAcid}.
+     */
+    public static AminoAcid getMitochondrialAminoAcidByCodon(final String rawCodon) {
+        return getMitochondrialAminoAcidByCodon(rawCodon, false, false, false, false, false);
     }
 
     /**
@@ -1093,31 +1105,8 @@ public final class FuncotatorUtils {
      * @param extraLoggingInfo A {@link String} containing extra info for logging purposes.
      * @return A {@link String} containing a sequence of single-letter amino acids.
      */
-    public static String createAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
-
-        Utils.nonNull(codingSequence);
-
-        final StringBuilder sb = new StringBuilder();
-
-        // Ensure that we don't have remainder bases:
-        int maxIndex = codingSequence.length();
-        if ( maxIndex % 3 != 0 ) {
-            maxIndex = (int)Math.floor(maxIndex / 3) * 3;
-            if ( !isFrameshift ) {
-                logger.warn("createAminoAcidSequence given a coding sequence of length not divisible by 3.  Dropping bases from the end: " + (codingSequence.length() % 3) + (extraLoggingInfo.isEmpty() ? "" : " " + extraLoggingInfo));
-            }
-        }
-
-        for ( int i = 0; i < maxIndex; i += 3 ) {
-            final AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
-            if ( aa == null ) {
-                throw new UserException.MalformedFile("File contains a bad codon sequence that has no amino acid equivalent: " + codingSequence.substring(i, i+3));
-            }
-            else {
-                sb.append(aa.getLetter());
-            }
-        }
-        return sb.toString();
+    private static String createAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
+        return createAminoAcidSequenceHelper(codingSequence, isFrameshift, false, extraLoggingInfo);
     }
 
     /**
@@ -1128,8 +1117,11 @@ public final class FuncotatorUtils {
      * @param extraLoggingInfo A {@link String} containing extra info for logging purposes.
      * @return A {@link String} containing a sequence of single-letter amino acids.
      */
-    public static String createMitochondrialAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
+    private static String createMitochondrialAminoAcidSequence(final String codingSequence, final boolean isFrameshift, final String extraLoggingInfo) {
+        return createAminoAcidSequenceHelper(codingSequence, isFrameshift, true, extraLoggingInfo);
+    }
 
+    private static String createAminoAcidSequenceHelper(final String codingSequence, final boolean isFrameshift, final boolean isMitochondria, final String extraLoggingInfo) {
         Utils.nonNull(codingSequence);
 
         final StringBuilder sb = new StringBuilder();
@@ -1143,8 +1135,11 @@ public final class FuncotatorUtils {
             }
         }
 
+        // Call the correct method based on whether or not we're looking up mitochondria:
+        final Function<String, AminoAcid> aminoAcidLookupFunction = ( isMitochondria ? FuncotatorUtils::getMitochondrialAminoAcidByCodon : FuncotatorUtils::getEukaryoticAminoAcidByCodon );
+
         for ( int i = 0; i < maxIndex; i += 3 ) {
-            final AminoAcid aa = getEukaryoticAminoAcidByCodon(codingSequence.substring(i, i+3));
+            final AminoAcid aa = aminoAcidLookupFunction.apply(codingSequence.substring(i, i+3));
             if ( aa == null ) {
                 throw new UserException.MalformedFile("File contains a bad codon sequence that has no amino acid equivalent: " + codingSequence.substring(i, i+3));
             }
@@ -2131,6 +2126,7 @@ public final class FuncotatorUtils {
         return result;
     }
 
+
     /**
      * Create a {@link ProteinChangeInfo} object which will represent the change in the protein sequence
      * which would be caused by a variant.
@@ -2148,6 +2144,36 @@ public final class FuncotatorUtils {
                                                             final int alignedCodingSequenceAlleleStart,
                                                             final String codingSequence,
                                                             final Strand strand) {
+        return createProteinChangeInfoHelper(refAllele, altAllele, codingSequenceAlleleStart, alignedCodingSequenceAlleleStart, codingSequence, strand, false);
+    }
+
+    /**
+     * Create a {@link ProteinChangeInfo} object which will represent the change in the protein sequence
+     * which would be caused by a variant using Mitochondrial codon decoding.
+     * @param refAllele The strand-corrected (i.e. if on the - strand, it has been reverse-complemented) reference {@link Allele} for the variant.  Must not be {@code null}.
+     * @param altAllele The strand-corrected (i.e. if on the - strand, it has been reverse-complemented) alternate {@link Allele} for the variant.  Must not be {@code null}.
+     * @param codingSequenceAlleleStart The position (1-based, inclusive) in the _coding sequence_ at which the variant begins.  (NOTE: This is _not_ the same the genomic position, nor is it necessarily the same as the transcript position of the variant).
+     * @param alignedCodingSequenceAlleleStart The codon-aligned position (1-based, inclusive) in the _coding sequence_ at which the variant begins.  (NOTE: This is _not_ the same the genomic position, nor is it necessarily the same as the transcript position of the variant).
+     * @param codingSequence The strand-corrected (i.e. if on the - strand, it has been reverse-complemented) sequence of bases containing the _coding sequence_ for a particular transcript of a gene, from which we should render a protein change.  (NOTE: This is _not_ the same the gene sequence, nor is it necessarily the same as the whole transcript sequence).  Must not be {@code null}.
+     * @param strand The {@link Strand} on which the transcript for this protein change occurs.  Must not be {@link Strand#NONE}.  Must not be {@code null}.
+     * @return A {@link ProteinChangeInfo} object describing how the mitochondrial protein coding sequence changes for the given {@code refAllele} and {@code altAllele}.
+     */
+    public static ProteinChangeInfo createProteinChangeInfoForMitochondria(final Allele refAllele,
+                                                            final Allele altAllele,
+                                                            final int codingSequenceAlleleStart,
+                                                            final int alignedCodingSequenceAlleleStart,
+                                                            final String codingSequence,
+                                                            final Strand strand) {
+        return createProteinChangeInfoHelper(refAllele, altAllele, codingSequenceAlleleStart, alignedCodingSequenceAlleleStart, codingSequence, strand, true);
+    }
+
+    private static ProteinChangeInfo createProteinChangeInfoHelper( final Allele refAllele,
+                                                                    final Allele altAllele,
+                                                                    final int codingSequenceAlleleStart,
+                                                                    final int alignedCodingSequenceAlleleStart,
+                                                                    final String codingSequence,
+                                                                    final Strand strand,
+                                                                    final boolean isMitochondria) {
         Utils.nonNull(refAllele);
         Utils.nonNull(altAllele);
         Utils.nonNull(codingSequence);
@@ -2157,15 +2183,31 @@ public final class FuncotatorUtils {
         final boolean isFrameshift =  GATKVariantContextUtils.isFrameshift( refAllele, altAllele );
 
         // Get our protein sequences:
-        final String referenceProteinSequence = FuncotatorUtils.createAminoAcidSequence(codingSequence, false, "(size=" + codingSequence.length() + ", ref allele: " + refAllele.getBaseString() + ")");
-        final String alternateProteinSequence = FuncotatorUtils.createAminoAcidSequence(
-                // Subtract 1 to account for 1-based genomic positions:
-                codingSequence.substring(0, codingSequenceAlleleStart - 1) +
-                        altAllele.getBaseString() +
-                        codingSequence.substring(codingSequenceAlleleStart + refAllele.length() -1),
-                isFrameshift,
-                "(size=" + codingSequence.length() + ", alt allele: " + altAllele.getBaseString() + ")"
-        );
+        final String referenceProteinSequence;
+        final String alternateProteinSequence;
+        if ( isMitochondria ) {
+            referenceProteinSequence = FuncotatorUtils.createMitochondrialAminoAcidSequence(codingSequence, false, "(size=" + codingSequence.length() + ", ref allele: " + refAllele.getBaseString() + ")");
+            alternateProteinSequence = FuncotatorUtils.createMitochondrialAminoAcidSequence(
+                    // Subtract 1 to account for 1-based genomic positions:
+                    codingSequence.substring(0, codingSequenceAlleleStart - 1) +
+                            altAllele.getBaseString() +
+                            codingSequence.substring(codingSequenceAlleleStart + refAllele.length() -1),
+                    isFrameshift,
+                    "(size=" + codingSequence.length() + ", alt allele: " + altAllele.getBaseString() + ")"
+            );
+        }
+        else {
+            referenceProteinSequence = FuncotatorUtils.createAminoAcidSequence(codingSequence, false, "(size=" + codingSequence.length() + ", ref allele: " + refAllele.getBaseString() + ")");
+            alternateProteinSequence = FuncotatorUtils.createAminoAcidSequence(
+                    // Subtract 1 to account for 1-based genomic positions:
+                    codingSequence.substring(0, codingSequenceAlleleStart - 1) +
+                            altAllele.getBaseString() +
+                            codingSequence.substring(codingSequenceAlleleStart + refAllele.length() -1),
+                    isFrameshift,
+                    "(size=" + codingSequence.length() + ", alt allele: " + altAllele.getBaseString() + ")"
+            );
+        }
+
 
         // Get the _index_ of the first different amino acid (not the protein position!):
         // Default to the amino acid corresponding to the aligned coding sequence allele start:

@@ -50,6 +50,9 @@ public class FuncotatorTestConstants {
 
     public static final String FUNCOTATOR_DATA_SOURCES_MAIN_FOLDER = FUNCOTATOR_LARGE_FILES_DIR + "funcotator_dataSources" + File.separator;
 
+    // MT Info:
+    public static final String MT_TRANSCRIPT = "ENST00000361567.2";
+
     // Gencode main GTF file:
     public static final String GENCODE_DATA_SOURCE_GTF_PATH_HG19   = FUNCOTATOR_DATA_SOURCES_MAIN_FOLDER + "gencode" + File.separator + REFERENCE_VERSION_HG19 + File.separator + "gencode.v19.regressionTestVariantSet.gtf";
     public static final String GENCODE_DATA_SOURCE_FASTA_PATH_HG19 = FUNCOTATOR_DATA_SOURCES_MAIN_FOLDER + "gencode" + File.separator + REFERENCE_VERSION_HG19 + File.separator + "gencode.v19.regressionTestVariantSet.pc_transcripts.fa";

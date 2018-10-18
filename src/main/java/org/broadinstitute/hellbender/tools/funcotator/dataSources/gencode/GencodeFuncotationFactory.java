@@ -1668,14 +1668,28 @@ public class GencodeFuncotationFactory extends DataSourceFuncotationFactory {
                 // ########################################################################################
                 // FIX THE PROTEIN STUFF HERE:
 
-                final FuncotatorUtils.ProteinChangeInfo proteinChangeInfo = FuncotatorUtils.createProteinChangeInfo(
-                        refAllele,
-                        altAllele,
-                        sequenceComparison.getCodingSequenceAlleleStart(),
-                        sequenceComparison.getAlignedCodingSequenceAlleleStart(),
-                        correctedCodingSequence,
-                        sequenceComparison.getStrand()
-                );
+                final FuncotatorUtils.ProteinChangeInfo proteinChangeInfo;
+                // Check if we need to make a mitochondrial protein change or a regular one:
+                if ( FuncotatorConstants.MITOCHONDRIAL_CONTIG_NAMES.contains(variant.getContig()) ) {
+                    proteinChangeInfo = FuncotatorUtils.createProteinChangeInfoForMitochondria(
+                            refAllele,
+                            altAllele,
+                            sequenceComparison.getCodingSequenceAlleleStart(),
+                            sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                            correctedCodingSequence,
+                            sequenceComparison.getStrand()
+                    );
+                }
+                else {
+                    proteinChangeInfo = FuncotatorUtils.createProteinChangeInfo(
+                            refAllele,
+                            altAllele,
+                            sequenceComparison.getCodingSequenceAlleleStart(),
+                            sequenceComparison.getAlignedCodingSequenceAlleleStart(),
+                            correctedCodingSequence,
+                            sequenceComparison.getStrand()
+                    );
+                }
 
                 // Set our protein change:
                 sequenceComparison.setProteinChangeInfo( proteinChangeInfo );
